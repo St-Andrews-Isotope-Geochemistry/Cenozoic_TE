@@ -23,6 +23,7 @@ sns.stripplot(data=foram_te_df, x='age_Ma', hue='species_simple',
               jitter=False, linewidth=1, marker="s")
 ax.set(ylabel=None)
 
+#test
 
 #Given the distributions, let's omit velascoensis, hyphalus, umbonifera, beccariiformis, subspiratus, and laurisae
 #omit_species=['velascoensis', 'hyphalus', 'umbonifera', 'beccariiformis', 'laurisae', 'subspiratus']
