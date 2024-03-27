@@ -1,0 +1,6 @@
+#Ignore the figures directory
+figs/
+#Ignore the data directory
+data/
+#Ignore csv files
+*.csv
