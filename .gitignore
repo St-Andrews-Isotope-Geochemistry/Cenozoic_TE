@@ -1,6 +1,6 @@
 #Ignore the figures directory
-figs/
+#figs/
 #Ignore the data directory
-data/
+#data/
 #Ignore csv files
-*.csv
+#*.csv
