@@ -4,3 +4,5 @@
 #data/
 #Ignore csv files
 #*.csv
+#Ignore png files
+*.png
