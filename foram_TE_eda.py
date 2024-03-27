@@ -30,6 +30,14 @@ ax.set(ylabel=None)
 #for species in omit_species:
 #    foram_te_df=foram_te_df.loc[~foram_te_df['species_simple'].str.contains(species)]
 
+isotopes=['Li7', 'B11', 'Na23', 'Mg24', 'Al27', 'P31', 'S32', 'K39',
+      'Mn55','Fe56','Ni58','Co59','Cu63', 'Zn64', 'Rb85', 'Sr88', 
+      'Mo92','Cd111', 'Ba138', 'Nd146', 'U238']
 
 
+for iso in isotopes:
+    fig, ax =plt.subplots(figsize=(12, 6))
+    sns.scatterplot(data=foram_te_df, x='age_Ma', y=iso, hue='species_simple')
+    plt.legend(fontsize=6, title=None)
+    plt.ylabel(iso+'/Ca')
 
