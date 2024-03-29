@@ -6,3 +6,5 @@
 #*.csv
 #Ignore png files
 *.png
+#Ignore zip files
+*.zip
