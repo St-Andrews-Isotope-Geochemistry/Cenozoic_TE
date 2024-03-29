@@ -59,6 +59,7 @@ def omega_depth_correction(omega, depth, temp=2, newdepth=0):
 
 #Read Yu and Elderfield data
 data_path=Path(os.getcwd())/"data"
+fig_path=Path(os.getcwd())/"figures"
 file_path=data_path/"Yu_Elderfield_calibration.xlsx"
 Yu_Elder_df=pd.read_excel(file_path)
 
@@ -89,26 +90,34 @@ Yu_Elder_df['omega_a']=(Yu_Elder_df['DCO3_a']+Yu_Elder_df['CO3sat_a'])/Yu_Elder_
 
 
 
+
+# import Dai data
+file_path=data_path/"Dai2023_umbonifera_calibration.csv"
+Dai_df=pd.read_csv(file_path)
+
+#concatenate dataframes
+Yu_Elder_Dai_df=pd.concat([Yu_Elder_df, Dai_df], axis=0, ignore_index=True)
+
+
 #plot B/Ca vs omega_c
 fig, ax = plt.subplots()
-sns.scatterplot(data=Yu_Elder_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
-plt.show()
-Yu_Elder_df['log(omega_c)']=np.log(Yu_Elder_df['omega_c'])
+Yu_Elder_Dai_df['log(omega_c)']=np.log(Yu_Elder_Dai_df['omega_c'])
 
 
 #plot side by side with log transformed omega_c
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-sns.scatterplot(ax=ax[0], data=Yu_Elder_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(ax=ax[0], data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax[0].set_title('raw')
 ax[0].set_xlabel(r'B/Ca ($\mu$mol/mol)')
-sns.scatterplot(ax=ax[1], data=Yu_Elder_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
+sns.scatterplot(ax=ax[1], data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
 ax[1].set_title('transformed')
 ax[1].set_xlabel(r'B/Ca ($\mu$mol/mol)')
 
 
 #get species names
-species_names=pd.unique(Yu_Elder_df['species'])
+species_names=pd.unique(Yu_Elder_Dai_df['species'])
 
 #make dictionaries to store linear and log fits
 species_fit_dict={}
@@ -120,7 +129,7 @@ species_col=dict(zip(species_names, colors))
 #cycle through species and fit linear and log fits, and plot
 fig, ax =plt.subplots(figsize=(6, 6))
 for species in species_names:
-    df=Yu_Elder_df.loc[Yu_Elder_df['species']==species]
+    df=Yu_Elder_Dai_df.loc[Yu_Elder_Dai_df['species']==species]
     
     X=df['B_Ca_umolmol']
     Y=df['omega_c']
@@ -143,7 +152,7 @@ for species in species_names:
 ax.legend()
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
 ax.set_ylabel(r'$\Omega_c$')
-
+fig.savefig(fig_path/'B_omega_calibration.png', dpi=300)
 
 
 
@@ -190,6 +199,10 @@ foram_df.loc[foram_df['species'].str.contains('mundulus'), 'species_simple']='Ci
 foram_df.loc[foram_df['species'].str.contains('eocaenus'), 'species_simple']='Cibicidoides eocaenus'
 foram_df.loc[foram_df['species'].str.contains('grimsdalei'), 'species_simple']='Cibicidoides grimsdalei'
 
+#make a column designating the species to calibrate to
+foram_df['B_omega_calibration']=foram_df['species_simple']
+# calibrate truempyi to umbonifera
+foram_df.loc[foram_df['B_omega_calibration']=='Nuttallides truempyi', 'B_omega_calibration']='Nuttallides umbonifera'
 
 
 
@@ -199,25 +212,25 @@ foram_df['omega_logfit']=np.nan
 for species in species_names:
     
     #perform linear and log predictions
-    foram_df['omega_linfit']=np.where(foram_df['species_simple']==species, 
+    foram_df['omega_linfit']=np.where(foram_df['B_omega_calibration']==species, 
                                       linpred(foram_df['B11'].values, species_fit_dict[species]['lin']), 
                                       foram_df['omega_linfit'])
     
-    foram_df['omega_logfit']=np.where(foram_df['species_simple']==species,
+    foram_df['omega_logfit']=np.where(foram_df['B_omega_calibration']==species,
                                         linpred(foram_df['B11'].values, species_fit_dict[species]['log'], y_transform=np.exp),
                                         foram_df['omega_logfit'])
     
 
 
-#isolate Cibicidoides for plotting
-cibs_df=foram_df.dropna(subset='species', axis=0)
-cibs_df=cibs_df.loc[cibs_df['species_simple'].isin(species_names)]
 
+plt_df=foram_df.dropna(subset=['omega_logfit'], axis=0)
 #plot
 fig, ax =plt.subplots(figsize=(10, 6), nrows=2, ncols=1, sharex=True)
-sns.scatterplot(ax=ax[0], data=cibs_df, x='age_Ma', y='omega_logfit', hue='core', style='species_simple', legend=False)
-sns.scatterplot(ax=ax[1], data=cibs_df, x='age_Ma', y='B11', hue='core', style='species_simple')
-plt.legend(fontsize=6)
+p1=sns.scatterplot(ax=ax[0], data=plt_df, x='age_Ma', y='omega_logfit', 
+                   hue='core', style='species_simple')
+p2=sns.scatterplot(ax=ax[1], data=plt_df, x='age_Ma', y='B11', 
+                   hue='core', style='species_simple', legend=False)
+p1.legend(fontsize=6, ncols=2)
 
 
 
@@ -236,16 +249,24 @@ foram_df.to_csv(data_path/"foram_dataframe.csv")
 
 
 #isolate Cibicidoides for plotting
-cibs_df=foram_df.dropna(subset='species', axis=0)
-cibs_df=cibs_df.loc[cibs_df['species_simple'].isin(species_names)]
+plt_df=foram_df.dropna(subset=['omega_logfit'], axis=0)
 
 #plot
 fig, ax =plt.subplots(nrows=2, ncols=1,  figsize=(12, 8), sharex=True, sharey=True)
-sns.scatterplot(ax=ax[0], data=cibs_df, x='age_Ma', y='omega_logfit', hue='core')
-sns.scatterplot(ax=ax[1], data=cibs_df, x='age_Ma', y='omega_logfit_3000', hue='core')
-plt.show()
+p1=sns.scatterplot(ax=ax[0], data=plt_df, x='age_Ma', y='omega_logfit', hue='core', 
+                style='species_simple')
+p2=sns.scatterplot(ax=ax[1], data=plt_df, x='age_Ma', y='omega_logfit_3000', hue='core', 
+                style='species_simple', legend=False)
+p1.legend(fontsize=6, ncol=2)
 
-
+#plot
+fig, ax =plt.subplots(nrows=2, ncols=1,  figsize=(12, 8), sharex=True)
+p1=sns.scatterplot(ax=ax[0], data=plt_df, x='age_Ma', y='B11', hue='core', 
+                style='species_simple', legend=False)
+p2=sns.scatterplot(ax=ax[1], data=plt_df, x='age_Ma', y='omega_logfit_3000', hue='core', 
+                style='species_simple')
+p2.legend(fontsize=6, ncol=2)
+fig.savefig(fig_path/'B_omega3000_logfit.png', dpi=300)
 
 
 
