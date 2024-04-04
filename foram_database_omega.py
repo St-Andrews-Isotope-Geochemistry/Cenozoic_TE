@@ -92,32 +92,35 @@ Yu_Elder_df['omega_a']=(Yu_Elder_df['DCO3_a']+Yu_Elder_df['CO3sat_a'])/Yu_Elder_
 
 
 # import Dai data
-file_path=data_path/"Dai2023_umbonifera_calibration.csv"
-Dai_df=pd.read_csv(file_path)
+file_path=data_path/"Brown_omega_Ca.csv"
+Brown_df=pd.read_csv(file_path)
+Brown_df['species']='Nuttallides umbonifera'
+Brown_df['log(omega_c)']=np.log(Brown_df['omega_c'])  
+
 
 #concatenate dataframes
-Yu_Elder_Dai_df=pd.concat([Yu_Elder_df, Dai_df], axis=0, ignore_index=True)
+Yu_Elder_Brown_df=pd.concat([Yu_Elder_df, Brown_df], axis=0, ignore_index=True)
 
 
 #plot B/Ca vs omega_c
 fig, ax = plt.subplots()
-sns.scatterplot(data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
-Yu_Elder_Dai_df['log(omega_c)']=np.log(Yu_Elder_Dai_df['omega_c'])
+Yu_Elder_Brown_df['log(omega_c)']=np.log(Yu_Elder_Brown_df['omega_c'])
 
 
 #plot side by side with log transformed omega_c
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-sns.scatterplot(ax=ax[0], data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(ax=ax[0], data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax[0].set_title('raw')
 ax[0].set_xlabel(r'B/Ca ($\mu$mol/mol)')
-sns.scatterplot(ax=ax[1], data=Yu_Elder_Dai_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
+sns.scatterplot(ax=ax[1], data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
 ax[1].set_title('transformed')
 ax[1].set_xlabel(r'B/Ca ($\mu$mol/mol)')
 
 
 #get species names
-species_names=pd.unique(Yu_Elder_Dai_df['species'])
+species_names=pd.unique(Yu_Elder_Brown_df['species'])
 
 #make dictionaries to store linear and log fits
 species_fit_dict={}
@@ -129,7 +132,7 @@ species_col=dict(zip(species_names, colors))
 #cycle through species and fit linear and log fits, and plot
 fig, ax =plt.subplots(figsize=(6, 6))
 for species in species_names:
-    df=Yu_Elder_Dai_df.loc[Yu_Elder_Dai_df['species']==species]
+    df=Yu_Elder_Brown_df.loc[Yu_Elder_Brown_df['species']==species]
     
     X=df['B_Ca_umolmol']
     Y=df['omega_c']
