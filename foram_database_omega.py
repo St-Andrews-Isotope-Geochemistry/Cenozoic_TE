@@ -63,15 +63,21 @@ fig_path=Path(os.getcwd())/"figures"
 file_path=data_path/"Yu_Elderfield_calibration.xlsx"
 Yu_Elder_df=pd.read_excel(file_path)
 Yu_Elder_df['reference']='Yu and Elderfield (2007)'
+Yu_Elder_df['salinity']=35
+
 
 #Read Rae_2011 data
 file_path=data_path/"Rae2011_calibration.csv"
 Rae_df=pd.read_csv(file_path)
 Rae_df['reference']='Rae et al. (2011)'
 
+#remove all that aren't mundulus or wuellertorfi
+Rae_df=Rae_df.loc[(Rae_df['species']=='Cibicidoides mundulus') | (Rae_df['species']=='Cibicidoides wuellerstorfi')]
+
 #concatenate dataframes
 Yu_Elder_Rae_df=pd.concat([Yu_Elder_df, Rae_df[['region', 'core', 'water_depth_m', 'temp_c', 
-                                                'pH foram', 'DCO3_c', 'species', 'B_Ca_umolmol', 'reference']]], 
+                                                'pH foram', 'DCO3_c', 'species', 'B_Ca_umolmol', 'reference', 
+                                                'salinity']]], 
                           axis=0, ignore_index=True)
 
 
@@ -84,22 +90,22 @@ Yu_Elder_Rae_df['pressure_bar']=depth_m_to_pressure_bar(Yu_Elder_Rae_df['water_d
 #set Ca and Mg concentrations and salinity
 calcium_conc=0.01
 mag_conc=0.053
-salinity=35
+
 
 #calculate KspC and KspA from kgen
-dict_ksp=kgen.calc_Ks(["KspC","KspA"], temp_c=Yu_Elder_df['temp_c'].values, sal=salinity, p_bar=Yu_Elder_df['pressure_bar'].values, 
+dict_ksp=kgen.calc_Ks(["KspC","KspA"], temp_c=Yu_Elder_Rae_df['temp_c'].values, sal=Yu_Elder_Rae_df['salinity'].values, p_bar=Yu_Elder_Rae_df['pressure_bar'].values, 
                        calcium=calcium_conc, magnesium=mag_conc)
 
-Yu_Elder_df['KspC']=dict_ksp['KspC']
-Yu_Elder_df['KspA']=dict_ksp['KspA']
+Yu_Elder_Rae_df['KspC']=dict_ksp['KspC']
+Yu_Elder_Rae_df['KspA']=dict_ksp['KspA']
 
 #calculate CO3sat_c and CO3sat_c
-Yu_Elder_df['CO3sat_c']=Yu_Elder_df['KspC']/calcium_conc*10**6
-Yu_Elder_df['CO3sat_a']=Yu_Elder_df['KspA']/calcium_conc*10**6
+Yu_Elder_Rae_df['CO3sat_c']=Yu_Elder_Rae_df['KspC']/calcium_conc*10**6
+Yu_Elder_Rae_df['CO3sat_a']=Yu_Elder_Rae_df['KspA']/calcium_conc*10**6
 
 #calculate omega
-Yu_Elder_df['omega_c']=(Yu_Elder_df['DCO3_c']+Yu_Elder_df['CO3sat_c'])/Yu_Elder_df['CO3sat_c']
-Yu_Elder_df['omega_a']=(Yu_Elder_df['DCO3_a']+Yu_Elder_df['CO3sat_a'])/Yu_Elder_df['CO3sat_a']
+Yu_Elder_Rae_df['omega_c']=(Yu_Elder_Rae_df['DCO3_c']+Yu_Elder_Rae_df['CO3sat_c'])/Yu_Elder_Rae_df['CO3sat_c']
+Yu_Elder_Rae_df['omega_a']=(Yu_Elder_Rae_df['DCO3_a']+Yu_Elder_Rae_df['CO3sat_a'])/Yu_Elder_Rae_df['CO3sat_a']
 
 
 
@@ -108,36 +114,42 @@ Yu_Elder_df['omega_a']=(Yu_Elder_df['DCO3_a']+Yu_Elder_df['CO3sat_a'])/Yu_Elder_
 file_path=data_path/"Brown_omega_Ca.csv"
 Brown_df=pd.read_csv(file_path)
 Brown_df['species']='Nuttallides umbonifera'
+Brown_df['reference']='Brown et al. (2011)/Dai et al. (2023)'
 Brown_df['log(omega_c)']=np.log(Brown_df['omega_c'])  
 
 
 #concatenate dataframes
-Yu_Elder_Brown_df=pd.concat([Yu_Elder_df, Brown_df], axis=0, ignore_index=True)
+Yu_Elder_Rae_Brown_df=pd.concat([Yu_Elder_Rae_df, Brown_df], axis=0, ignore_index=True)
 
 
 #plot B/Ca vs omega_c
 fig, ax = plt.subplots()
-sns.scatterplot(data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(data=Yu_Elder_Rae_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
-Yu_Elder_Brown_df['log(omega_c)']=np.log(Yu_Elder_Brown_df['omega_c'])
+ax.legend(fontsize=10)
+Yu_Elder_Rae_Brown_df['log(omega_c)']=np.log(Yu_Elder_Rae_Brown_df['omega_c'])
+
+
+#remove nans
+Yu_Elder_Rae_Brown_df.dropna(subset=['B_Ca_umolmol', 'omega_c'], inplace=True)
 
 
 #plot side by side with log transformed omega_c
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
-sns.scatterplot(ax=ax[0], data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
+sns.scatterplot(ax=ax[0], data=Yu_Elder_Rae_Brown_df, x='B_Ca_umolmol', y='omega_c', hue='species')
 ax[0].set_title('raw')
 ax[0].set_xlabel(r'B/Ca ($\mu$mol/mol)')
-sns.scatterplot(ax=ax[1], data=Yu_Elder_Brown_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
+sns.scatterplot(ax=ax[1], data=Yu_Elder_Rae_Brown_df, x='B_Ca_umolmol', y='log(omega_c)', hue='species')
 ax[1].set_title('transformed')
 ax[1].set_xlabel(r'B/Ca ($\mu$mol/mol)')
 
 
 #get species names
-species_names=pd.unique(Yu_Elder_Brown_df['species'])
+species_names=pd.unique(Yu_Elder_Rae_Brown_df['species'])
 
 #make dictionaries to store linear and log fits
 species_fit_dict={}
-
+xpredict_dict={}
 #Make colormap for species
 colors=plt.rcParams['axes.prop_cycle'].by_key()['color'][0:len(species_names)]
 species_col=dict(zip(species_names, colors))
@@ -145,12 +157,13 @@ species_col=dict(zip(species_names, colors))
 #cycle through species and fit linear and log fits, and plot
 fig, ax =plt.subplots(figsize=(6, 6))
 for species in species_names:
-    df=Yu_Elder_Brown_df.loc[Yu_Elder_Brown_df['species']==species]
+    df=Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species]
     
     X=df['B_Ca_umolmol']
     Y=df['omega_c']
     
     xpredict=np.linspace(min(X), max(X), 30)
+    xpredict_dict[species]=xpredict
     
     linmdl= linregress(df)
     logmdl = linregress(df, y_transform=np.log)
@@ -165,13 +178,31 @@ for species in species_names:
     ax.plot(xpredict, linpred(xpredict, logmdl, y_transform=np.exp), color=species_col[species], 
                label=f'r_sq = {logmdl.rsquared:.2f}', ls='dashed')
     
-ax.legend()
+ax.legend(fontsize=8)
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
 ax.set_ylabel(r'$\Omega_c$')
 fig.savefig(fig_path/'B_omega_calibration.png', dpi=300)
 
 
 
+# log fit only
+fig, ax = plt.subplots()
+p1=sns.scatterplot(data=Yu_Elder_Rae_Brown_df, x='B_Ca_umolmol', y='omega_c', 
+                hue='species', style='reference')
+for species in species_names:
+    rsq=species_fit_dict[species]['log'].rsquared
+    ax.plot(xpredict_dict[species], linpred(xpredict_dict[species], species_fit_dict[species]['log'], y_transform=np.exp),
+            color=species_col[species], label='R$^2$ = {:.2f}'.format(rsq))
+h,l = ax.get_legend_handles_labels()
+
+for i in [4,0]:
+    h.pop(i)
+    l.pop(i)
+
+p1.legend(h, l, fontsize=6, loc='upper left')
+ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
+ax.set_ylabel(r'$\Omega_c$')
+fig.savefig(fig_path/'B_omega_calibration_log.png', dpi=300)
 
 
 ## Foram data   
@@ -256,8 +287,7 @@ foram_df['omega_linfit']=np.nan
 foram_df['omega_logfit']=np.nan
 
 
-a=foram_df.loc[foram_df['species_simple']=='Oridorsalis umbonatus']
-
+#cycle through species and perform linear and log predictions
 
 for species in species_names:
     
@@ -301,6 +331,83 @@ foram_df['omega_linfit_3000']=omega_depth_correction(foram_df['omega_linfit'], f
 foram_df['omega_logfit_3000']=omega_depth_correction(foram_df['omega_logfit'], foram_df['palaeo_depth_m'], newdepth=3000)
 
 
+
+
+
+## Temperature data
+
+from loess.loess_1d import loess_1d
+temp_df=pd.read_csv(data_path/"Meckler2022_temp.csv")
+
+xout, yout, wout = loess_1d(temp_df['age_Ma'].values, temp_df['temp_c'].values, 
+                            xnew=None, degree=1, npoints=8, rotate=False, sigy=None)
+
+
+fig, ax =plt.subplots(figsize=(12, 6))
+p1=sns.scatterplot(data=temp_df, x='age_Ma', y='temp_c', color='black')
+plt.plot(xout, yout, color='red')
+
+#add interpolated temperature to foram_df
+foram_df['temp_c']=np.interp(foram_df['age_Ma'], xout, yout)
+
+
+
+
+## Ca and Mg
+
+#read in Ca and Mg data
+Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
+Mg_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='magnesium')
+
+
+#perform linear interpolation on age_Ma in foram_df to get calcium and magnesium values
+foram_df['Ca_sw']=np.interp(foram_df['age_Ma'], Ca_df['age'], Ca_df['median'])
+foram_df['Mg_sw']=np.interp(foram_df['age_Ma'], Mg_df['age'], Mg_df['median'])
+
+#plot
+fig, ax =plt.subplots(figsize=(10, 6))
+sns.scatterplot(data=foram_df, x='age_Ma', y='Ca_sw', color='black')
+sns.scatterplot(data=foram_df, x='age_Ma', y='Mg_sw', color='red')
+sns.lineplot(data=Ca_df, x='age', y='median', color='black')
+sns.lineplot(data=Mg_df, x='age', y='median', color='red')
+ax.set_ylabel(r'Concentration ($\mu$mol/kg)')
+ax.set_xlabel('Age (Ma)')
+ax.set_xlim(0, 70)
+ax.invert_xaxis()
+plt.legend(['Calcium', 'Magnesium'])
+
+
+
+
+#convert depth to pressure
+foram_df['pressure_bar']=depth_m_to_pressure_bar(foram_df['palaeo_depth_m'].values)
+
+
+
+#calculate KspC from kgen
+dict_ksp=kgen.calc_Ks(["KspC"], temp_c=foram_df['temp_c'].values, sal=35, p_bar=foram_df['pressure_bar'].values, 
+                       calcium=foram_df['Ca_sw'].values/1000, magnesium=foram_df['Mg_sw'].values/1000)
+
+foram_df['ksp_c']=dict_ksp['KspC']
+
+#calculate [CO3]
+foram_df['CO3']=foram_df['omega_logfit']*foram_df['ksp_c']/(foram_df['Ca_sw']/1000)*10**6
+
+
+
+fig, ax =plt.subplots(figsize=(10, 6))
+sns.scatterplot(data=foram_df, x='age_Ma', y='CO3', hue='core')
+ax.invert_xaxis()
+
+
+
+
+
+
+
+
+
+
 #save to disk
 foram_df.to_csv(data_path/"foram_dataframe.csv")
 
@@ -327,25 +434,3 @@ fig.savefig(fig_path/'B_omega3000_logfit.png', dpi=300)
 
 
 
-
-## Ca and Mg
-
-#read in Ca and Mg data
-Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
-Mg_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='magnesium')
-
-
-#perform linear interpolation on age_Ma in foram_df to get calcium and magnesium values
-foram_df['Ca_sw']=np.interp(foram_df['age_Ma'], Ca_df['age'], Ca_df['median'])
-foram_df['Mg_sw']=np.interp(foram_df['age_Ma'], Mg_df['age'], Mg_df['median'])
-
-#plot
-fig, ax =plt.subplots(figsize=(10, 6))
-sns.scatterplot(data=foram_df, x='age_Ma', y='Ca_sw', color='black')
-sns.scatterplot(data=foram_df, x='age_Ma', y='Mg_sw', color='red')
-sns.lineplot(data=Ca_df, x='age', y='median', color='black')
-sns.lineplot(data=Mg_df, x='age', y='median', color='red')
-ax.set_ylabel(r'Concentration ($\mu$mol/kg)')
-ax.set_xlabel('Age (Ma)')
-ax.set_xlim(0, 70)
-plt.legend(['Calcium', 'Magnesium'])
