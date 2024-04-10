@@ -62,9 +62,22 @@ data_path=Path(os.getcwd())/"data"
 fig_path=Path(os.getcwd())/"figures"
 file_path=data_path/"Yu_Elderfield_calibration.xlsx"
 Yu_Elder_df=pd.read_excel(file_path)
+Yu_Elder_df['reference']='Yu and Elderfield (2007)'
+
+#Read Rae_2011 data
+file_path=data_path/"Rae2011_calibration.csv"
+Rae_df=pd.read_csv(file_path)
+Rae_df['reference']='Rae et al. (2011)'
+
+#concatenate dataframes
+Yu_Elder_Rae_df=pd.concat([Yu_Elder_df, Rae_df[['region', 'core', 'water_depth_m', 'temp_c', 
+                                                'pH foram', 'DCO3_c', 'species', 'B_Ca_umolmol', 'reference']]], 
+                          axis=0, ignore_index=True)
+
+
 
 #convert depth to pressure
-Yu_Elder_df['pressure_bar']=depth_m_to_pressure_bar(Yu_Elder_df['water_depth_m'].values)
+Yu_Elder_Rae_df['pressure_bar']=depth_m_to_pressure_bar(Yu_Elder_Rae_df['water_depth_m'].values)
 
 
 
@@ -177,6 +190,21 @@ for sheet_name, core_df in excel_data.items():
 foram_df.reset_index(drop=True, inplace=True)
 
 
+#set lat lons and basin
+lats={'1262':-27.186, '522':-26.114, '689B': -64.517000, '1264': -28.532680, '999':12.744, 
+      '926':3.719017, '1209':32.6517, 'U1409_U1407':41.42498833, '1218':8.889630, 'U1334':7.999, 
+      '1263':-28.532830, 'U1406': 40.349930}
+lons={'1262':1.577, '522':-5.130, '689B':3.0999, '1264': 2.845510, '999': -78.7393, 
+      '926':-42.908300, '1209':158.505983, 'U1409_U1407':-49.8133117, '1218': -135.366660, 'U1334':-131.973, 
+      '1263':2.779480, 'U1406': -51.649830}
+basin={'1262':'Atlantic', '522':'Atlantic', '689B':'Southern', '1264':'Atlantic', '999': 'Atlantic', 
+       '926':'Atlantic', '1209':'Pacific', 'U1409_U1407':'Atlantic', '1218':'Pacific', 'U1334':'Pacific', 
+       '1263':'Atlantic', 'U1406': 'Atlantic'}
+
+foram_df['lat']=foram_df['core'].map(lats)
+foram_df['lon']=foram_df['core'].map(lons)
+foram_df['ocean_basin']=foram_df['core'].map(basin)
+
 #1262 paleodepth
 foram_df.loc[foram_df['core']=='1262', 'palaeo_depth_m']=np.interp(foram_df.loc[foram_df['core']=='1262', 'age_Ma'], [56, 66], [3000, 3500])
 
@@ -202,25 +230,44 @@ foram_df.loc[foram_df['species'].str.contains('mundulus'), 'species_simple']='Ci
 foram_df.loc[foram_df['species'].str.contains('eocaenus'), 'species_simple']='Cibicidoides eocaenus'
 foram_df.loc[foram_df['species'].str.contains('grimsdalei'), 'species_simple']='Cibicidoides grimsdalei'
 
+
+#if species_simple is wuellerstorfi, mundulus or truempyi then remove B11_corrected
+foram_df.loc[foram_df['species_simple'].str.contains('wuellerstorfi|mundulus|truempyi|umbonatus'), 'B11 corrected to C. mundulus']=np.nan
+
+
 #make a column designating the species to calibrate to
 foram_df['B_omega_calibration']=foram_df['species_simple']
+
 # calibrate truempyi to umbonifera
 foram_df.loc[foram_df['B_omega_calibration']=='Nuttallides truempyi', 'B_omega_calibration']='Nuttallides umbonifera'
+
+
+
+#PROBLEMATIC!!!
+#where there is  B11_corrected, set B_omega_calibration to mundulus
+foram_df.loc[pd.notnull(foram_df['B11 corrected to C. mundulus']), 'B_omega_calibration']='Cibicidoides mundulus'
+#Create B11_for_omega column that uses B11 corrected to C. mundulus if available
+foram_df['B11_for_omega']=foram_df['B11']
+foram_df.loc[pd.notnull(foram_df['B11 corrected to C. mundulus']), 'B11_for_omega']=foram_df['B11 corrected to C. mundulus']
 
 
 
 foram_df['omega_linfit']=np.nan
 foram_df['omega_logfit']=np.nan
 
+
+a=foram_df.loc[foram_df['species_simple']=='Oridorsalis umbonatus']
+
+
 for species in species_names:
     
     #perform linear and log predictions
     foram_df['omega_linfit']=np.where(foram_df['B_omega_calibration']==species, 
-                                      linpred(foram_df['B11'].values, species_fit_dict[species]['lin']), 
+                                      linpred(foram_df['B11_for_omega'].values, species_fit_dict[species]['lin']), 
                                       foram_df['omega_linfit'])
     
     foram_df['omega_logfit']=np.where(foram_df['B_omega_calibration']==species,
-                                        linpred(foram_df['B11'].values, species_fit_dict[species]['log'], y_transform=np.exp),
+                                        linpred(foram_df['B11_for_omega'].values, species_fit_dict[species]['log'], y_transform=np.exp),
                                         foram_df['omega_logfit'])
     
 
@@ -235,6 +282,13 @@ p2=sns.scatterplot(ax=ax[1], data=plt_df, x='age_Ma', y='B11',
                    hue='core', style='species_simple', legend=False)
 p1.legend(fontsize=6, ncols=2)
 
+#plot
+fig, ax =plt.subplots(figsize=(10, 6), nrows=2, ncols=1, sharex=True)
+p1=sns.scatterplot(ax=ax[0], data=plt_df, x='age_Ma', y='omega_logfit', 
+                   hue='species_simple')
+p2=sns.scatterplot(ax=ax[1], data=plt_df, x='age_Ma', y='B11', 
+                   hue='species_simple', legend=False)
+p1.legend(fontsize=6, ncols=2)
 
 
 
