@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from matplotlib import gridspec
-
+from loess.loess_1d import loess_1d
+import PyCO2SYS as pyco2
 
 def find_outliers(array1, mod=1.5):
 
@@ -139,17 +140,7 @@ d13Cd18O_stack.loc[d13Cd18O_stack['Location'].str.contains('SOcn'),'ocean_basin'
 d13Cd18O_stack.loc[d13Cd18O_stack['Location'].str.contains('IOcn'),'ocean_basin']='Pacific/Indian'
 
 
-from loess.loess_1d import loess_1d
 
-for ocean in ['Atlantic', 'Pacific/Indian', 'Southern']:
-    temp_df=d13Cd18O_stack[d13Cd18O_stack['ocean_basin']==ocean]
-
-    xout, yout, wout = loess_1d(temp_df['Age'].values, temp_df['d13C'].values, 
-                            xnew=None, degree=1, npoints=100, rotate=False, sigy=None)
-
-    
-    d13Cd18O_stack.loc[d13Cd18O_stack['ocean_basin']==ocean, 'd13C_smooth']=yout
-    
 
 
 d13C_smooths_melt=pd.melt(d13C_smooths, id_vars=['age_Ma'], 
@@ -2182,7 +2173,15 @@ fig.savefig(fig_path/'EGU_fig11a.png', dpi=300)
 
 ## Fig 11b: Westerhold, Omega (basin), 
 
+foram_df_B11=foram_df.loc[pd.notnull(foram_df['omega_logfit'])]
+#From Tyrrell and Zeebe (2004) appendix f = 2.2
+surface_to_deep_CO3_ratio=2.2
+foram_df_B11['surface_CO3']=foram_df_B11['CO3']*surface_to_deep_CO3_ratio
 
+
+foram_df_B11_sorted=foram_df_B11.sort_values(by='age_Ma')   
+surface_CO3x, surface_CO3y, wout = loess_1d(foram_df_B11_sorted['age_Ma'].values, foram_df_B11_sorted['surface_CO3'].values, 
+                            xnew=np.arange(72), degree=1, npoints=50, rotate=False, sigy=None)
 
 
 
@@ -2240,15 +2239,17 @@ for i, (p5_df, lab, c) in enumerate(zip(df_names, df_labels, colours)):
 
 colours=['#1b9e77', '#d95f02', '#7570b3']
 custom_palette=sns.set_palette(sns.color_palette(colours))
-p4b=sns.scatterplot(data=foram_df_B11_agecut, x='age_Ma', y='surface_CO3', 
-                color='black', ax=ax[3], s=20, 
+#converted CO3 using ratio of 2.2 from Tyrrell and Zeebe (2004)
+p4b=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='surface_CO3', 
+                color='grey', ax=ax[3], s=20, 
                 legend=False, label='B/Ca-based')
+p4c=ax[3].plot(np.arange(72), surface_CO3y, color='black', linestyle='--', label='Loess fit')
 
 ax[3].set_ylabel(r'Surface [CO$_3^{2-}$] ($\mu$mol/kg)')
 ax[3].legend(loc='upper left', ncols=2)
 
 
-#CO3 (benthic) converted
+#CO3 (benthic) 
 colours=['#1b9e77', '#d95f02', '#7570b3']
 custom_palette=sns.set_palette(sns.color_palette(colours))
 p5=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='CO3', 
@@ -2270,7 +2271,7 @@ ax[0].invert_xaxis()
 
 
 #move the subplots together so that they slightly overlap
-plt.subplots_adjust(hspace=-0.2)
+plt.subplots_adjust(hspace=-0.1)
 #remove the box around the plots
 
 for i, axis in enumerate(ax):
@@ -2291,7 +2292,7 @@ for i, axis in enumerate(ax):
     axis.set_facecolor('none')
     for epoch, bounds in epoch_boundaries.items():
         axis.axvline(bounds[0], color='lightgrey', linestyle='--', zorder=1)
-#remove x ticks on all but the bottom plot
+
 
 fig.savefig(fig_path/'EGU_fig11b.png', dpi=300)
 
@@ -2316,3 +2317,148 @@ ax2.set_ylabel('Offset (mumol/kg)')
 plt.title('Zeebe and Tyrrell (2019)')
 ax2.legend(loc='lower right')
 fig.savefig(fig_path/'ZandT2019.png', dpi=300)
+
+
+
+
+## Fig 12: Westerhold, Omega (log scale), CO3 (log scale)
+
+
+
+foram_df_B11=foram_df.loc[pd.notnull(foram_df['omega_logfit'])]
+
+colours=['#1b9e77', '#d95f02', '#7570b3']
+custom_palette=sns.set_palette(sns.color_palette(colours))
+
+fig, ax = plt.subplots(figsize=(6, 6), nrows=3, sharex=True, constrained_layout=False)
+p1_a=sns.scatterplot(data=Westerhold_df, x='Age', y='d18O_adj', ax=ax[0], 
+                   edgecolor='none', s=1, color='grey', alpha=0.5, 
+                   label='Westerhold et al. (2020) data', legend=False,
+                   zorder=2)
+p1_b=sns.lineplot(data=Wester_loess_df, x='age_Ma', y='loess_long_d18O', color='black', 
+                  label='Westerhold et al. (2020) loess', ax=ax[0], legend=False, 
+                  zorder=3)
+ax[0].set_ylabel(r'Benthic $\delta^{18}$O')
+ax[0].set_ylim(-1.5, 5.5)
+ax[0].set_yticks(np.arange(0, 6, 2))
+
+p2=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='omega_logfit', 
+                hue='ocean_basin', palette=custom_palette,
+                ax=ax[1],zorder=3, s=20)
+ax[1].set_ylabel(r'$\Omega_c$')
+ax[1].set_yscale('log')
+ax[1].legend(fontsize=8, loc='center left')
+
+p3=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='CO3', 
+                hue='ocean_basin', palette=custom_palette,
+                ax=ax[2],zorder=3, s=30, marker='^')
+ax[2].set_ylabel(r'[CO$_3^{2-}$] ($\mu$mol/kg)')
+ax[2].set_yscale('log')
+ax[2].legend(fontsize=8, loc='center left')
+
+
+
+
+ax[0].set_xlim(0, 70)
+ax[2].set_xlabel('Age (Ma)')
+ax[0].invert_xaxis()
+ax[0].invert_yaxis()
+
+
+#move the subplots together so that they slightly overlap
+plt.subplots_adjust(hspace=-0.3)
+#remove the box around the plots
+
+for i, axis in enumerate(ax):
+    #if even
+    if i%2 == 0:
+        axis.spines['right'].set_visible(False)
+    else:
+        axis.spines['left'].set_visible(False)
+        axis.yaxis.tick_right()
+        axis.yaxis.set_label_position('right')
+    if i > 0:
+        axis.spines['top'].set_visible(False)
+    if i < len(ax)-1:
+        axis.spines['bottom'].set_visible(False)
+        plt.setp(axis.get_xticklabels(), visible=False)
+        plt.setp(axis.get_xticklines(), visible=False)
+
+    axis.set_facecolor('none')
+    for epoch, bounds in epoch_boundaries.items():
+        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
+                     zorder=1)
+
+
+
+fig.savefig(fig_path/'EGU_fig12.png', dpi=300)
+
+
+
+
+## ALK-DIC plot
+
+
+
+
+
+
+
+
+DIC_range=np.arange(1500, 2550, 10)
+
+alkrange=np.arange(2000, 2850, 10)
+
+result_df=pd.DataFrame()
+
+for alk in alkrange:
+
+    # Define input conditions
+    kwargs = dict(
+        par1 = alk,  # Value of the first parameter
+        par2 =  DIC_range, #np.arange(2100, 2305, 5),  # Value of the second parameter, which is a long vector of different DIC's!
+        par1_type = 1,  # The first parameter supplied is of type "1", which is "alkalinity"
+        par2_type = 2,  # The second parameter supplied is of type "2", which is "DIC"
+        salinity = 35,  # Salinity of the sample
+        temperature = 2,  # Temperature at input conditions
+        total_silicate = 20,  # Concentration of silicate  in the sample (in umol/kg)
+        total_phosphate = 2,  # Concentration of phosphate in the sample (in umol/kg)
+        opt_k_carbonic = 4,  # Choice of H2CO3 and HCO3- dissociation constants K1 and K2 ("4" means "Mehrbach refit")
+        opt_k_bisulfate = 1,  # Choice of HSO4- dissociation constants KSO4 ("1" means "Dickson")
+        opt_pH_scale = 1,
+        )
+    
+
+    # Run CO2SYS!
+    results = pyco2.sys(**kwargs)
+    
+    temp_df=pd.DataFrame(results)
+    
+    
+    
+    result_df=pd.concat([result_df, temp_df[['alkalinity', 'dic', 'pH', 'pCO2', 'carbonate', 'saturation_calcite']]], axis=0)
+    
+contour_labels=['pH', 'pCO2']
+styles=['solid', 'dotted']
+colours=['r', 'k']
+X, Y = np.meshgrid(DIC_range, alkrange)
+
+fig, ax = plt.subplots()
+for (label, style, colour) in zip(contour_labels, styles, colours):
+    Z=result_df[label].values.reshape(X.shape, order='C')
+    if label=='pCO2':
+        levels=np.array([10**x*np.arange(1, 10) for x in np.arange(0, 5)]).flatten()
+        CS=ax.contour(X, Y, Z, colors='lightgrey', linestyles=style, levels=levels)
+        CS=ax.contour(X, Y, Z, colors='k', linestyles=style, levels=[1, 10, 100, 1000, 10000])
+        ax.clabel(CS, inline=True, fontsize=10, levels=[1, 10, 100, 1000, 10000])
+    else:
+        CS=ax.contour(X, Y, Z, colors=colour, linestyles=style)
+        ax.clabel(CS, inline=True, fontsize=10)
+    plt.xlabel(r'DIC ($\mu$mol/kg)')
+    plt.ylabel(r'alkalinity ($\mu$mol/kg)')
+    
+
+    
+proxy = [plt.Line2D([0], [0], linestyle=style, c=colour) for style, colour in zip(styles, colours)]
+plt.legend(proxy, contour_labels, loc='upper left')
+fig.savefig(fig_path/'ALK-DIC.png', dpi=300)
