@@ -132,7 +132,7 @@ Yu_Elder_Rae_Brown_df['log(omega_c)']=np.log(Yu_Elder_Rae_Brown_df['omega_c'])
 
 #remove nans
 Yu_Elder_Rae_Brown_df.dropna(subset=['B_Ca_umolmol', 'omega_c'], inplace=True)
-
+Yu_Elder_Rae_Brown_df.reset_index(drop=True, inplace=True)
 
 #plot side by side with log transformed omega_c
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
@@ -149,6 +149,7 @@ species_names=pd.unique(Yu_Elder_Rae_Brown_df['species'])
 
 #make dictionaries to store linear and log fits
 species_fit_dict={}
+species_fit_DCO3_dict={}
 xpredict_dict={}
 #Make colormap for species
 colors=plt.rcParams['axes.prop_cycle'].by_key()['color'][0:len(species_names)]
@@ -165,8 +166,14 @@ for species in species_names:
     xpredict=np.linspace(min(X), max(X), 30)
     xpredict_dict[species]=xpredict
     
+    
     linmdl= linregress(df)
     logmdl = linregress(df, y_transform=np.log)
+    
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'omega_c_linpred']=linpred(X, linmdl)
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'omega_c_logpred']=linpred(X, logmdl, y_transform=np.exp)
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'lin_r_sq']=linmdl.rsquared
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'log_r_sq']=logmdl.rsquared
     
     species_fit_dict[species]={'lin':linmdl, 'log':logmdl}
     
@@ -177,6 +184,16 @@ for species in species_names:
                label=f'r_sq = {linmdl.rsquared:.2f}')
     ax.plot(xpredict, linpred(xpredict, logmdl, y_transform=np.exp), color=species_col[species], 
                label=f'r_sq = {logmdl.rsquared:.2f}', ls='dashed')
+    
+    
+    
+    linmdl= linregress(df, target='DCO3_c')
+    logmdl = linregress(df, y_transform=np.log, target='DCO3_c')
+    
+    species_fit_DCO3_dict={'lin':linmdl, 'log':logmdl}
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'DCO3_c_linpred']=linpred(X, linmdl)
+    Yu_Elder_Rae_Brown_df.loc[Yu_Elder_Rae_Brown_df['species']==species, 'lin_DCO3_r_sq']=linmdl.rsquared
+    
     
 ax.legend(fontsize=8)
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
@@ -203,6 +220,12 @@ p1.legend(h, l, fontsize=6, loc='upper left')
 ax.set_xlabel(r'B/Ca ($\mu$mol/mol)')
 ax.set_ylabel(r'$\Omega_c$')
 fig.savefig(fig_path/'B_omega_calibration_log.png', dpi=300)
+
+
+
+#export the data
+Yu_Elder_Rae_Brown_df.to_csv(data_path/"BCa_omega_calibration_df.csv")
+
 
 
 ## Foram data   
