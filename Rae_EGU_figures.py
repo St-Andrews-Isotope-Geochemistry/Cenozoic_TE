@@ -38,6 +38,38 @@ def find_outliers(array1, mod=1.5):
         
     return outs
 
+
+def make_stacked_plot(ax, epoch_lines=True):
+
+    for i, axis in enumerate(ax):
+        #if even
+        if i%2 == 0:
+            axis.spines['right'].set_visible(False)
+        else:
+            axis.spines['left'].set_visible(False)
+            axis.yaxis.tick_right()
+            axis.yaxis.set_label_position('right')
+        if i > 0:
+            axis.spines['top'].set_visible(False)
+        if i < len(ax)-1:
+            axis.spines['bottom'].set_visible(False)
+            plt.setp(axis.get_xticklabels(), visible=False)
+            plt.setp(axis.get_xticklines(), visible=False)
+
+        axis.set_facecolor('none')
+        
+        if epoch_lines:
+            epoch_boundaries={'Paleocene':(65.5, 55.8), 
+                  'Eocene':(55.8, 33.9), 
+                  'Oligocene':(33.9, 23.0), 
+                  'Miocene':(23.0, 5.3), 
+                  'Pliocene':(5.3, 1.8), 
+                  'Pleistocene':(1.8,0.01)}
+            for epoch, bounds in epoch_boundaries.items():
+                axis.axvline(bounds[0], color='lightgrey', linestyle='--',
+                            zorder=1)
+
+
 #define paths
 data_path=Path(os.getcwd())/"data"
 fig_path=Path(os.getcwd())/"figures"
@@ -212,36 +244,6 @@ ax[0].set_facecolor('none')
 ax[1].set_facecolor('none')
 
 
-
-
-
-
-
-
-
-
-
-"""
-#plot d13C and d18O with 100 data point smoothing
-fig, ax = plt.subplots(nrows=2, figsize=(10, 6), sharex=True)
-p1=sns.scatterplot(data=d13Cd18O_stack, x='Age', y='d18O', hue='ocean_basin', ax=ax[0], 
-                   edgecolor='none', s=1, palette='pastel', alpha=0.3)
-p2=sns.scatterplot(data=d13Cd18O_stack, x='Age', y='d13C', hue='ocean_basin', ax=ax[1], 
-                   edgecolor='none', s=1, palette='pastel', alpha=0.3)
-p3=sns.lineplot(data=d13Cd18O_stack, x='Age', y='d13C_smooth', hue='ocean_basin', 
-                ax=ax[1], palette='dark')
-ax[0].legend(markerscale=5, fontsize=6, loc='upper right')
-ax[1].legend(markerscale=5, fontsize=6, loc='lower right')
-ax[0].set_ylim(-2, 6)
-ax[1].set_ylim(-2, 3)
-ax[0].invert_xaxis()
-ax[0].invert_yaxis()
-"""
-
-
-
-
-
 ## Figure 4: Temperature
 
 
@@ -407,25 +409,7 @@ ax[1].invert_yaxis()
 plt.subplots_adjust(hspace=-0.5)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',)
-#remove x ticks on all but the bottom plot
+make_stacked_plot(ax, epoch_lines=True)
 fig.savefig(fig_path/'EGU_fig1.png', dpi=300)
 
 
@@ -523,27 +507,7 @@ ax[0].invert_xaxis()
 #move the subplots together so that they slightly overlap
 plt.subplots_adjust(hspace=-0.2)
 #remove the box around the plots
-
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',)
-#remove x ticks on all but the bottom plot
-
+make_stacked_plot(ax, epoch_lines=True)
 fig.savefig(fig_path/'EGU_fig2.png', dpi=300)
 
 
@@ -652,41 +616,21 @@ p2=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='B11',
                 hue_order=hue_order,ax=ax[1],zorder=3, s=20)
 ax[1].set_ylabel(r'B/Ca ($\mu$mol/mol)')
 ax[1].set_ylim(25, 250)
-ax[1].legend(fontsize=8, ncol=2, loc='lower left')
+ax[1].legend(fontsize=8, ncol=2, loc='upper left', bbox_to_anchor=(0, 1.1))
 
 ax[0].set_xlim(0, 70)
 ax[1].set_xlabel('Age (Ma)')
 ax[0].invert_xaxis()
 ax[0].invert_yaxis()
-ax[1].invert_yaxis()
+#ax[1].invert_yaxis()
 
 #move the subplots together so that they slightly overlap
-plt.subplots_adjust(hspace=-0.5)
+plt.subplots_adjust(hspace=-0.15)
 #remove the box around the plots
-
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
+make_stacked_plot(ax, epoch_lines=True)
 
 
-
-fig.savefig(fig_path/'EGU_fig4a.png', dpi=300)
+fig.savefig(fig_path/'EGU_fig4a_BCa_normal.png', dpi=300)
 
 
 
@@ -968,27 +912,7 @@ ax[1].invert_yaxis()
 #move the subplots together so that they slightly overlap
 plt.subplots_adjust(hspace=-0.5)
 #remove the box around the plots
-
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
-
+make_stacked_plot(ax, epoch_lines=True)
 
 
 fig.savefig(fig_path/'EGU_fig5a.png', dpi=300)
@@ -1234,27 +1158,7 @@ ax[1].invert_yaxis()
 #move the subplots together so that they slightly overlap
 plt.subplots_adjust(hspace=-0.5)
 #remove the box around the plots
-
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
-
+make_stacked_plot(ax, epoch_lines=True)
 
 
 fig.savefig(fig_path/'EGU_fig6a.png', dpi=300)
@@ -1540,26 +1444,7 @@ ax[1].invert_yaxis()
 plt.subplots_adjust(hspace=-0.5)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
-
+make_stacked_plot(ax, epoch_lines=True)
 
 
 fig.savefig(fig_path/'EGU_fig7a.png', dpi=300)
@@ -1789,26 +1674,7 @@ ax[0].invert_yaxis()
 plt.subplots_adjust(hspace=-0.5)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
-
+make_stacked_plot(ax, epoch_lines=True)
 
 
 fig.savefig(fig_path/'EGU_fig8.png', dpi=300)
@@ -1819,7 +1685,6 @@ fig.savefig(fig_path/'EGU_fig8.png', dpi=300)
 
 foram_df_B11=foram_df.loc[pd.notnull(foram_df['omega_logfit'])]
 Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
-
 
 
 fig, ax = plt.subplots(figsize=(6, 10), nrows=4, sharex=True, constrained_layout=False)
@@ -1868,6 +1733,8 @@ ax[3].set(ylabel='[CO$_3^{2-}$] ($\mu$mol/kg)')
 ax[3].set(xlabel='Age (Ma)')
 ax[3].invert_xaxis()
 ax[3].set_ylim(20, 100)
+ax[3].set_yscale('log')
+ax[3].set_yticks([20, 30, 40, 50, 60, 100], [20, 30, 40, 50, 60, 100])
 
 
 
@@ -1881,25 +1748,7 @@ ax[0].invert_xaxis()
 plt.subplots_adjust(hspace=-0.3)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--', zorder=1)
-#remove x ticks on all but the bottom plot
+make_stacked_plot(ax, epoch_lines=True)
 
 fig.savefig(fig_path/'EGU_fig9.png', dpi=300)
 
@@ -2016,25 +1865,7 @@ ax[0].invert_xaxis()
 plt.subplots_adjust(hspace=-0.3)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--', zorder=1)
-#remove x ticks on all but the bottom plot
+make_stacked_plot(ax, epoch_lines=True)
 
 fig.savefig(fig_path/'EGU_fig10.png', dpi=300)
 
@@ -2148,25 +1979,7 @@ ax[0].invert_xaxis()
 plt.subplots_adjust(hspace=-0.2)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--', zorder=1)
-#remove x ticks on all but the bottom plot
+make_stacked_plot(ax, epoch_lines=True)
 
 fig.savefig(fig_path/'EGU_fig11a.png', dpi=300)
 
@@ -2274,25 +2087,7 @@ ax[0].invert_xaxis()
 plt.subplots_adjust(hspace=-0.1)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--', zorder=1)
-
+make_stacked_plot(ax, epoch_lines=True)
 
 fig.savefig(fig_path/'EGU_fig11b.png', dpi=300)
 
@@ -2339,6 +2134,7 @@ p1_b=sns.lineplot(data=Wester_loess_df, x='age_Ma', y='loess_long_d18O', color='
                   label='Westerhold et al. (2020) loess', ax=ax[0], legend=False, 
                   zorder=3)
 ax[0].set_ylabel(r'Benthic $\delta^{18}$O')
+ax[0].invert_yaxis()
 ax[0].set_ylim(-1.5, 5.5)
 ax[0].set_yticks(np.arange(0, 6, 2))
 
@@ -2362,34 +2158,14 @@ ax[2].legend(fontsize=8, loc='center left')
 ax[0].set_xlim(0, 70)
 ax[2].set_xlabel('Age (Ma)')
 ax[0].invert_xaxis()
-ax[0].invert_yaxis()
+
 
 
 #move the subplots together so that they slightly overlap
 plt.subplots_adjust(hspace=-0.3)
 #remove the box around the plots
 
-for i, axis in enumerate(ax):
-    #if even
-    if i%2 == 0:
-        axis.spines['right'].set_visible(False)
-    else:
-        axis.spines['left'].set_visible(False)
-        axis.yaxis.tick_right()
-        axis.yaxis.set_label_position('right')
-    if i > 0:
-        axis.spines['top'].set_visible(False)
-    if i < len(ax)-1:
-        axis.spines['bottom'].set_visible(False)
-        plt.setp(axis.get_xticklabels(), visible=False)
-        plt.setp(axis.get_xticklines(), visible=False)
-
-    axis.set_facecolor('none')
-    for epoch, bounds in epoch_boundaries.items():
-        axis.axvline(bounds[0], color='lightgrey', linestyle='--',
-                     zorder=1)
-
-
+make_stacked_plot(ax, epoch_lines=True)
 
 fig.savefig(fig_path/'EGU_fig12.png', dpi=300)
 
@@ -2462,3 +2238,100 @@ for (label, style, colour) in zip(contour_labels, styles, colours):
 proxy = [plt.Line2D([0], [0], linestyle=style, c=colour) for style, colour in zip(styles, colours)]
 plt.legend(proxy, contour_labels, loc='upper left')
 fig.savefig(fig_path/'ALK-DIC.png', dpi=300)
+
+
+
+## Fig 13: Westerhold, CO3
+
+foram_df_B11=foram_df.loc[pd.notnull(foram_df['omega_logfit'])]
+Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
+
+
+fig, ax = plt.subplots(figsize=(6, 8), nrows=2, sharex=True, constrained_layout=False)
+
+#d18O
+p1_a=sns.scatterplot(data=Westerhold_df, x='Age', y='d18O_adj', ax=ax[0], 
+                   edgecolor='none', s=1, color='grey', alpha=0.5, 
+                   label='Westerhold et al. (2020) data', legend=False, zorder=3)
+p1_b=sns.lineplot(data=Wester_loess_df, x='age_Ma', y='loess_long_d18O', color='black', 
+                  label='Westerhold et al. (2020) loess', ax=ax[0], legend=False, zorder=4)
+ax[0].set_ylim(-1.5, 5.5)
+ax[0].set_yticks(np.arange(0, 6, 2))
+ax[0].set_ylabel(r'Benthic $\delta^{18}$O')
+ax[0].set_zorder(4)
+ax[0].invert_yaxis()
+
+
+#CO3
+
+p4=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='CO3', 
+                hue='ocean_basin', palette=custom_palette, ax=ax[1], s=20, zorder=3)
+ax[1].legend(fontsize=10, loc='lower right')
+ax[1].set(ylabel='[CO$_3^{2-}$] ($\mu$mol/kg)')
+ax[1].set(xlabel='Age (Ma)')
+ax[1].invert_xaxis()
+ax[1].set_ylim(20, 100)
+ax[1].set_yscale('log')
+ax[1].set_yticks([20, 30, 40, 50, 60, 100], [20, 30, 40, 50, 60, 100])
+
+
+
+ax[0].set_xlim(0, 70)
+ax[1].set_xlabel('Age (Ma)')
+ax[0].invert_xaxis()
+
+#move the subplots together so that they slightly overlap
+plt.subplots_adjust(hspace=-0.3)
+#remove the box around the plots
+
+make_stacked_plot(ax, epoch_lines=True)
+
+fig.savefig(fig_path/'EGU_fig13.png', dpi=300)
+
+
+## Fig 13b: Westerhold, CO3 (reverse)
+
+foram_df_B11=foram_df.loc[pd.notnull(foram_df['omega_logfit'])]
+Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
+
+
+fig, ax = plt.subplots(figsize=(6, 6), nrows=2, sharex=True, constrained_layout=False)
+
+#d18O
+p1_a=sns.scatterplot(data=Westerhold_df, x='Age', y='d18O_adj', ax=ax[0], 
+                   edgecolor='none', s=1, color='grey', alpha=0.5, 
+                   label='Westerhold et al. (2020) data', legend=False, zorder=3)
+p1_b=sns.lineplot(data=Wester_loess_df, x='age_Ma', y='loess_long_d18O', color='black', 
+                  label='Westerhold et al. (2020) loess', ax=ax[0], legend=False, zorder=4)
+ax[0].set_ylim(-1.5, 5.5)
+ax[0].set_yticks(np.arange(0, 6, 2))
+ax[0].set_ylabel(r'Benthic $\delta^{18}$O')
+ax[0].set_zorder(4)
+ax[0].invert_yaxis()
+
+
+#CO3
+
+p4=sns.scatterplot(data=foram_df_B11, x='age_Ma', y='CO3', 
+                hue='ocean_basin', palette=custom_palette, ax=ax[1], s=20, zorder=3)
+ax[1].legend(fontsize=10, loc='lower left')
+ax[1].set(ylabel='[CO$_3^{2-}$] ($\mu$mol/kg)')
+ax[1].set(xlabel='Age (Ma)')
+ax[1].invert_xaxis()
+ax[1].set_ylim(20, 100)
+ax[1].set_yscale('log')
+ax[1].set_yticks([20, 30, 40, 50, 60, 100], [20, 30, 40, 50, 60, 100])
+ax[1].invert_yaxis()
+
+
+ax[0].set_xlim(0, 70)
+ax[1].set_xlabel('Age (Ma)')
+ax[0].invert_xaxis()
+
+#move the subplots together so that they slightly overlap
+plt.subplots_adjust(hspace=-0.6)
+#remove the box around the plots
+
+make_stacked_plot(ax, epoch_lines=True)
+
+fig.savefig(fig_path/'EGU_fig13b.png', dpi=300)
