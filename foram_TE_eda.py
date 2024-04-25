@@ -115,7 +115,7 @@ epoch_boundaries={'Paleocene':(65.5, 55.8),
 
 #order the foram species for colours Nuts first then Cibs. 
 #units
-
+"""""
 for iso in isotopes:
     
     #set any negative data to np.nan
@@ -140,4 +140,12 @@ for iso in isotopes:
     fig.savefig(fig_path/f'{iso}_vs_age.png', dpi=300)
     print(f'{iso}: {sum(out)+sum(negatives)} outliers removed')
     
+
+"""
+
+
+
+
+
+
 
