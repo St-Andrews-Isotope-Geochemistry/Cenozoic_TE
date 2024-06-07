@@ -8,6 +8,7 @@ import numpy as np
 
 
 def find_outliers(array1, mod=1.5):
+
     """
     Returns boolean array where true values denote outliers in original array
     
@@ -35,7 +36,47 @@ def find_outliers(array1, mod=1.5):
         outs=np.isnan(array1)
         
     return outs
+def isotope_to_element(isotope):
+    """
+    Returns the element of the isotope
+    
+    Parameters
+    ----------
+    isotope : str
+        The name of the isotope.
 
+    Returns
+    -------
+    str
+        The element of the isotope.
+
+    """
+    elements={'Li7':'Li', 'B11':'B', 'Na23':'Na', 'Mg24':'Mg', 'Al27':'Al', 'P31':'P', 'S32':'S', 'K39':'K',
+      'Mn55':'Mn','Fe56':'Fe','Ni58':'Ni','Co59':'Co','Cu63':'Cu', 'Zn64':'Zn', 'Rb85':'Rb', 'Sr88':'Sr', 
+      'Mo92':'Mo','Cd111':'Cd', 'Ba138':'Ba', 'Nd146':'Nd', 'U238':'U'}
+    return elements[isotope]
+def isotope_to_units(isotope):
+    """
+    Returns the units of the isotope
+    
+    Parameters
+    ----------
+    isotope : str
+        The name of the isotope.
+
+    Returns
+    -------
+    str
+        The units of the isotope.
+
+    """
+    units={'Li7':r'$\mu$mol/mol', 'B11':r'$\mu$mol/mol', 'Na23':'mmol/mol', 'Mg24':'mmol/mol', 
+           'Al27':r'$\mu$mol/mol', 'P31':r'$\mu$mol/mol', 'S32':'mmol/mol', 'K39':r'$\mu$mol/mol',
+            'Mn55':r'$\mu$mol/mol', 'Fe56':r'$\mu$mol/mol', 'Ni58':r'$\mu$mol/mol', 
+            'Co59':r'$\mu$mol/mol', 'Cu63':r'$\mu$mol/mol', 'Zn64':r'$\mu$mol/mol', 
+            'Rb85':r'$\mu$mol/mol', 'Sr88':'mmol/mol', 'Mo92':r'$\mu$mol/mol', 'Cd111':r'$\mu$mol/mol', 
+            'Ba138':r'$\mu$mol/mol', 'Nd146':r'$\mu$mol/mol','U238':'nmol/mol'}
+    return units[isotope]
 
 #define paths
 data_path=Path(os.getcwd())/"data"
@@ -63,6 +104,18 @@ isotopes=['Li7', 'B11', 'Na23', 'Mg24', 'Al27', 'P31', 'S32', 'K39',
       'Mn55','Fe56','Ni58','Co59','Cu63', 'Zn64', 'Rb85', 'Sr88', 
       'Mo92','Cd111', 'Ba138', 'Nd146', 'U238']
 
+
+#make Cenozoic epoch boundaries dict
+epoch_boundaries={'Paleocene':(65.5, 55.8), 
+                  'Eocene':(55.8, 33.9), 
+                  'Oligocene':(33.9, 23.0), 
+                  'Miocene':(23.0, 5.3), 
+                  'Pliocene':(5.3, 1.8), 
+                  'Pleistocene':(1.8,0.01)}
+
+#order the foram species for colours Nuts first then Cibs. 
+#units
+"""""
 for iso in isotopes:
     
     #set any negative data to np.nan
@@ -77,10 +130,22 @@ for iso in isotopes:
     fig, ax =plt.subplots(figsize=(12, 6))
     p1=sns.scatterplot(data=foram_te_df, x='age_Ma', y=iso, 
                        hue='species_simple', style='core')
+    #add epoch boundaries
+    for epoch, bounds in epoch_boundaries.items():
+        plt.axvline(bounds[0], alpha=0.2, color='grey', linestyle='--',)
     p1.legend(fontsize=6, ncol=2)
     
-    plt.ylabel(iso+'/Ca')
+    plt.ylabel(f'{isotope_to_element(iso)}/Ca ({isotope_to_units(iso)})')
+    plt.xlabel('Age (Ma)')
     fig.savefig(fig_path/f'{iso}_vs_age.png', dpi=300)
     print(f'{iso}: {sum(out)+sum(negatives)} outliers removed')
     
+
+"""
+
+
+
+
+
+
 
