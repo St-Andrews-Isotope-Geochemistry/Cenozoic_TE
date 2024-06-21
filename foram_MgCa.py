@@ -273,8 +273,7 @@ for key in pd.unique(foram_df_BWT_Owullmund['species_simple']):
 ax[-1].set_xlim(0, 65)
 ax[-1].invert_xaxis()
 ax[-1].set_xlabel('Age (Ma)')
-plt.subplots_adjust(hspace=-0.7)
-make_stacked_plot(ax, epoch_lines=True)
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.7)
 fig.savefig(fig_path/'BWT_1.png', dpi=300)
 
 
@@ -456,7 +455,7 @@ def lin_fit_predict(X, c, m, H):
     return (MgCa/MgCa_sw**H-c)/m
 
 
-
+foram_df_Mg_cibs=foram_df_Mg.loc[foram_df_Mg['species_simple'].str.contains('Cibicidoides')]
 
 xdata=(foram_df_Mg_cibs['Mg/Ca_sw'], foram_df_Mg_cibs['temp_c_smooth'].values)
 ydata=foram_df_Mg_cibs['Mg_species_corrected'].values
@@ -464,7 +463,7 @@ ydata=foram_df_Mg_cibs['Mg_species_corrected'].values
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 
 xdata_predict=(foram_df_Mg_cibs['Mg_species_corrected'], foram_df_Mg_cibs['Mg/Ca_sw'])
-foram_df_Mg_cibs['BWT']=lin_fit_predict(xdata_predict, *parameters)
+foram_df_Mg_cibs['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
 
 x_predict=np.linspace(foram_df_Mg_cibs['Mg_species_corrected'].min(), foram_df_Mg_cibs['Mg_species_corrected'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
@@ -482,7 +481,7 @@ plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
 plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -506,7 +505,7 @@ parameters_dict={'Lear_linear_Cibs':parameters}
 
 parameters, covariance = curve_fit(expo_fit, xdata, ydata)
 
-foram_df_Mg_cibs['BWT']=expo_fit_predict(xdata_predict, *parameters)
+foram_df_Mg_cibs['BWT_expo']=expo_fit_predict(xdata_predict, *parameters)
 
 ypredict_2=expo_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
 ypredict_3=expo_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
@@ -523,7 +522,7 @@ plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
 plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT_expo', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -594,7 +593,7 @@ ydata=foram_df_wLear_cibs_Atl['Mg_species_corrected'].values
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 #predict with all basins
 xdata_predict=(foram_df_wLear_cibs['Mg_species_corrected'], foram_df_wLear_cibs['Mg/Ca_sw'])
-foram_df_wLear_cibs['BWT']=lin_fit_predict(xdata_predict, *parameters)
+foram_df_wLear_cibs['BWT_lin_wLear']=lin_fit_predict(xdata_predict, *parameters)
 
 x_predict=np.linspace(foram_df_wLear_cibs_Atl['Mg_species_corrected'].min(), foram_df_wLear_cibs_Atl['Mg_species_corrected'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
@@ -612,7 +611,7 @@ plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
 plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT_lin_wLear', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -629,22 +628,69 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 parameters_dict['Lear_linear_Cibs_wLearData']=parameters
 
 
+## fit with +Lear data (Atl Cibs only) expo
+
+
+#fit to only Atlantic
+xdata=(foram_df_wLear_cibs_Atl['Mg/Ca_sw'], foram_df_wLear_cibs_Atl['temp_c_smooth'].values)
+ydata=foram_df_wLear_cibs_Atl['Mg_species_corrected'].values
+
+parameters, covariance = curve_fit(expo_fit, xdata, ydata)
+#predict with all basins
+xdata_predict=(foram_df_wLear_cibs['Mg_species_corrected'], foram_df_wLear_cibs['Mg/Ca_sw'])
+foram_df_wLear_cibs['BWT_expo_wLear']=expo_fit_predict(xdata_predict, *parameters)
+
+x_predict=np.linspace(foram_df_wLear_cibs_Atl['Mg_species_corrected'].min(), foram_df_wLear_cibs_Atl['Mg_species_corrected'].max())
+ypredict_2=expo_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
+ypredict_3=expo_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
+ypredict_4=expo_fit_predict((x_predict, np.array([4]*len(x_predict))), *parameters)
+ypredict_5=expo_fit_predict((x_predict, np.array([5]*len(x_predict))), *parameters)
+
+
+fig, ax =plt.subplots(figsize=(10, 8))
+sns.scatterplot(data=foram_df_wLear_cibs_Atl, y='temp_c_smooth', x='Mg_species_corrected', hue='Mg/Ca_sw', ax=ax)
+plt.plot(x_predict, ypredict_2, label='Mg/Ca_sw=2')
+plt.plot(x_predict, ypredict_3 ,label='Mg/Ca_sw=3')
+plt.plot(x_predict, ypredict_4, label='Mg/Ca_sw=4')
+plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
+plt.legend()
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT_expo_wLear', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
+ax[1].invert_xaxis()
+fig.suptitle('Cibs only. Lear et al., 2015, exponential, w Lear data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
+
+
+parameters_dict['Lear_expo_Cibs_wLearData']=parameters
+
+
 
 ## Use simple lin regress instead on Cibs
 
-xdata=foram_df_wLear_cibs_Atl[['Mg/Ca_sw', 'Mg_species_corrected']].values
-ydata=foram_df_wLear_cibs_Atl['temp_c_smooth'].values
+foram_df_wLear_cibs_OLS=foram_df_wLear_cibs.copy()
+foram_df_wLear_cibs_OLS_Atl=foram_df_wLear_cibs_OLS.loc[foram_df_wLear_cibs_OLS['ocean_basin']=='Atlantic']
+xdata=foram_df_wLear_cibs_OLS_Atl[['Mg/Ca_sw', 'Mg_species_corrected']].values
+ydata=foram_df_wLear_cibs_OLS_Atl['temp_c_smooth'].values
 xdata=sm.add_constant(xdata)
 model = sm.OLS(ydata, xdata)
 results=model.fit()
-xdata_predict=foram_df_wLear_cibs[['Mg/Ca_sw', 'Mg_species_corrected']].values
+xdata_predict=foram_df_wLear_cibs_OLS[['Mg/Ca_sw', 'Mg_species_corrected']].values
 xdata_predict=sm.add_constant(xdata_predict)
 predictions=results.predict(xdata_predict)
 parameters=results.params
-foram_df_wLear_cibs_Atl['BWT']=predictions
+foram_df_wLear_cibs_OLS['BWT_OLS']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='BWT_OLS', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -660,11 +706,19 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 parameters_dict['OLS_Cibs_wLearData']=parameters
 
 
+
+
+fig ,ax = plt.subplots(figsize=(10, 8))
+sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='Mg_species_corrected', hue='Li7', ax=ax)
+ax.set_xlim(0, 65)
+ax.invert_xaxis()
+
+
 ## OLS with Li7 (no Lear data)
 
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT', hue='Li7', ax=ax[0])
+sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='BWT_OLS', hue='Li7', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -678,21 +732,21 @@ ax[1].invert_xaxis()
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
+foram_df_Mg_cibs_OLS=foram_df_Mg_cibs.copy()
 
-
-xdata=foram_df_Mg_cibs[['Mg/Ca_sw', 'Mg_species_corrected', 'Li7']].values
-ydata=foram_df_Mg_cibs['temp_c_smooth'].values
+xdata=foram_df_Mg_cibs_OLS[['Mg/Ca_sw', 'Mg_species_corrected', 'Li7']].values
+ydata=foram_df_Mg_cibs_OLS['temp_c_smooth'].values
 xdata=sm.add_constant(xdata)
 model = sm.OLS(ydata, xdata)
 results=model.fit()
-xdata_predict=foram_df_Mg_cibs[['Mg/Ca_sw', 'Mg_species_corrected', 'Li7']].values
+xdata_predict=foram_df_Mg_cibs_OLS[['Mg/Ca_sw', 'Mg_species_corrected', 'Li7']].values
 xdata_predict=sm.add_constant(xdata)
 predictions=results.predict(xdata_predict)
 parameters=results.params
-foram_df_Mg_cibs['BWT']=predictions
+foram_df_Mg_cibs_OLS['BWT_OLS_Li7']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_Mg_cibs_OLS, x='age_Ma', y='BWT_OLS_Li7', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -707,7 +761,7 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
 
-
+parameters_dict['OLS_Cibs_wLi7']=parameters
 
 
 ## Oridorsalis umbonatus calibration
@@ -720,18 +774,13 @@ ax.set_xlim(0, 65)
 ax.invert_xaxis()
 
 
-
-
-
-
-
 xdata=(foram_df_Orid['Mg/Ca_sw'], foram_df_Orid['temp_c_smooth'].values)
 ydata=foram_df_Orid['Mg_species_corrected'].values
 
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 
 xdata_predict=(foram_df_Orid['Mg_species_corrected'], foram_df_Orid['Mg/Ca_sw'])
-foram_df_Orid['BWT']=lin_fit_predict(xdata_predict, *parameters)
+foram_df_Orid['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
 
 x_predict=np.linspace(foram_df_Orid['Mg_species_corrected'].min(), foram_df_Orid['Mg_species_corrected'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
@@ -749,7 +798,7 @@ plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
 plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -763,7 +812,7 @@ fig.suptitle('Oridisalis only. Lear et al., 2015, linear')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
-parameters_dict={'Lear_linear_Oridisalis':parameters}
+parameters_dict['Lear_linear_Oridisalis']=parameters
 
 ## With Lear data
 
@@ -775,7 +824,7 @@ ydata=foram_df_wLear_Orid['Mg_species_corrected'].values
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 
 xdata_predict=(foram_df_wLear_Orid['Mg_species_corrected'], foram_df_wLear_Orid['Mg/Ca_sw'])
-foram_df_wLear_Orid['BWT']=lin_fit_predict(xdata_predict, *parameters)
+foram_df_wLear_Orid['BWT_lin_wLear']=lin_fit_predict(xdata_predict, *parameters)
 
 x_predict=np.linspace(foram_df_wLear_Orid['Mg_species_corrected'].min(), foram_df_wLear_Orid['Mg_species_corrected'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
@@ -793,7 +842,7 @@ plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
 plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT_lin_wLear', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -807,7 +856,7 @@ fig.suptitle('Oridisalis only. Lear et al., 2015, linear, w Lear data')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
-parameters_dict={'Lear_linear_Oridisalis_wLearData':parameters}
+parameters_dict['Lear_linear_Oridisalis_wLearData']=parameters
 
 
 ## OLS on Oridisalis
@@ -823,10 +872,10 @@ xdata_predict=foram_df_wLear_Orid[['Mg/Ca_sw', 'Mg_species_corrected']].values
 xdata_predict=sm.add_constant(xdata_predict)
 predictions=results.predict(xdata_predict)
 parameters=results.params
-foram_df_wLear_Orid['BWT']=predictions
+foram_df_wLear_Orid['BWT_OLS']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT_OLS', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -855,10 +904,10 @@ xdata_predict=foram_df_Orid[['Mg/Ca_sw', 'Mg_species_corrected', 'Li7']].values
 xdata_predict=sm.add_constant(xdata_predict)
 predictions=results.predict(xdata_predict)
 parameters=results.params
-foram_df_Orid['BWT']=predictions
+foram_df_Orid['BWT_OLS_Li7']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT_OLS_Li7', hue='ocean_basin', ax=ax[0])
 sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
@@ -872,6 +921,18 @@ fig.suptitle('Oridisalis only. OLS, w Li7')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 parameters_dict['OLS_Oridisalis_wLi7']=parameters
+
+
+
+
+
+## summary plot
+
+
+
+
+
+
 
 
 
