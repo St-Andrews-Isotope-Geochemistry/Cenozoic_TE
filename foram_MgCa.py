@@ -501,6 +501,13 @@ parameters_dict={'Lear_linear_Cibs':parameters}
 
 
 
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='Mg_species_corrected', 
+                hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[1])
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
+ax[1].invert_xaxis()
+
 ## fit Lear models to Cibs exponential
 
 parameters, covariance = curve_fit(expo_fit, xdata, ydata)
