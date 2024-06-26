@@ -8,3 +8,5 @@
 *.png
 #Ignore zip files
 *.zip
+#ignore geochemistry-helpers package
+geochemistry-helpers/
