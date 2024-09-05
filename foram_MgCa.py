@@ -124,11 +124,14 @@ epoch_boundaries={'Paleocene':(65.5, 55.8),
 #define paths
 data_path=Path(os.getcwd())/"data"
 fig_path=Path(os.getcwd())/"figures"
+
+
+## data wrangling
+
 #import data
 foram_df=pd.read_csv(data_path/"foram_dataframe.csv", index_col=0)
-temp_df=pd.read_csv(data_path/"Meckler2022_temp.csv")
-temp_df.dropna(subset=['temp_c'], inplace=True)
-temp_df.sort_values('age_Ma', inplace=True)
+meckler_df=pd.read_csv(data_path/"Meckler2022_temp.csv")
+
 
 Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
 Mg_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='magnesium')
@@ -137,13 +140,17 @@ MgCasw_df['MgCa_sw']=MgCasw_df['median_Mg']/MgCasw_df['median_Ca']
 cramer_temp=pd.read_csv(data_path/"Cramer_temp_d18O.csv")
 cramer_MgCa=pd.read_csv(data_path/"Cramer_MgCa.csv")
 Lear_MgCa=pd.read_csv(data_path/"Lear2015.csv")
+Lear_2000=pd.read_csv(data_path/"Lear2000.csv")
+
 #format data
 foram_df['DeltaCO3']=foram_df['CO3']-foram_df['CO3']/foram_df['omega_logfit']
 foram_df_Mg=foram_df.loc[pd.notnull(foram_df['Mg24'])]
-
 foram_df_Mg['Mg/Ca_sw']=foram_df_Mg['Mg_sw']/foram_df_Mg['Ca_sw']
 
-#reformat Lear
+meckler_df.dropna(subset=['temp_c'], inplace=True)
+meckler_df.sort_values('age_Ma', inplace=True)
+
+
 Lear_MgCa_form=Lear_MgCa[['Sample ID', 'Age (Ma)']].copy()
 Lear_MgCa_form['Mg/Ca']=Lear_MgCa['O. umbonatus Mg/Ca'].copy()
 Lear_MgCa_form['Mg/Ca_adj']=Lear_MgCa['O. umbonatus Mg/Ca_adj'].copy()
@@ -169,6 +176,8 @@ Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('690B'), 'ocean_basi
 Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('806'), 'ocean_basin']='Pacific'
 Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('926'), 'ocean_basin']='Atlantic'
 
+Lear_df=pd.concat([Lear_MgCa_form, Lear_2000], axis=0)
+Lear_df['Mg/Ca_adj']=Lear_df['Mg/Ca'].copy()
 
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('926'), 'ocean_basin']='Atlantic'
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('806'), 'ocean_basin']='Pacific'
@@ -186,7 +195,15 @@ cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('522'), 'ocean_basin']='Atlanti
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('1209'), 'ocean_basin']='Pacific'
 
 
-#species corrections
+
+
+
+
+
+## Literature Mg/Ca to BWT conversions
+
+
+#Mg/Ca species corrections
 species_correct_Mg={'Cibicidoides havanensis':-0.4606, 'Cibicidoides grimsdalei':0.2872, 
                     'Cibicidoides laurisae':-0.5659, 'Cibicidoides subspiratus':0.4336, 
                     'Cibicidoides eocaenus': -0.1039, 
@@ -196,9 +213,10 @@ species_correct_Mg={'Cibicidoides havanensis':-0.4606, 'Cibicidoides grimsdalei'
 
 foram_df_Mg=foram_df_Mg.loc[foram_df_Mg['species_simple'].isin(species_correct_Mg.keys())]
 
-foram_df_Mg['Mg_species_corrected']=foram_df_Mg['Mg24']
+foram_df_Mg['Mg_species_corrected']=foram_df_Mg['Mg24'].copy()
 for key, val in species_correct_Mg.items():
     foram_df_Mg.loc[foram_df_Mg['species_simple']==key, 'Mg_species_corrected']-=val
+
 
 #what is the distribution of the species through time?
 fig, ax =plt.subplots(figsize=(10, 6))
@@ -207,45 +225,67 @@ sns.stripplot(data=foram_df_Mg, x='age_Ma', hue='species_simple',
               jitter=False, linewidth=1, marker="s")
 ax.set(ylabel=None)
 
-
+#correction that could be applied to samples to make them like reductively cleaned samples (C. Lear)
 cleaning_correct=0.909
-foram_df_Mg['Mg_cleaning_corrected']=foram_df_Mg['Mg_species_corrected']*cleaning_correct
-
-
-Mg_to_BWT={'Oridorsalis umbonatus':lambda Mg: (Mg-1.45)/0.1, 
-            'Cibicidoides mundulus':lambda Mg: np.log(Mg/0.867)/0.109, 
-            'Cibicidoides wuellerstorfi':lambda Mg: np.log(Mg/0.867)/0.109}
+foram_df_Mg['Mg_cleaning_corrected']=foram_df_Mg['Mg24']*cleaning_correct
 
 
 
+#Oridorsalis umbonatus calibration from Lear et al (2015), equation 10 
+# C. mundulus calibration from Lear et al (2003), equation 1
+#Other Cibs calibration from Lear et al (2002), table 6.
 
-
-for species in pd.unique(foram_df_Mg['species_simple']):
+def convert_Mg_to_BWT(row, species_col, value_col):
+    species = row[species_col]
+    mg_value = row[value_col]
+    
     if species == 'Oridorsalis umbonatus':
-        Mg_to_BWT = lambda Mg: (Mg-1.45)/0.1
-    elif species == 'Cibicidoides mundulus': 
-        Mg_to_BWT = lambda Mg: np.log(Mg/0.9)/0.11
+        return (mg_value-1.45)/0.1
+    elif 'mundulus' in species:
+        return np.log(mg_value/0.9)/0.11
     else:
-        Mg_to_BWT = lambda Mg: np.log(Mg/0.867)/0.109
-        
-    foram_df_Mg.loc[foram_df_Mg['species_simple']==species, 'BWT_reduct']=Mg_to_BWT(foram_df_Mg.loc[foram_df_Mg['species_simple']==species, 'Mg_cleaning_corrected'])
-    foram_df_Mg.loc[foram_df_Mg['species_simple']==species, 'BWT']=Mg_to_BWT(foram_df_Mg.loc[foram_df_Mg['species_simple']==species, 'Mg_species_corrected'])
+        return np.log(mg_value/0.867)/0.109
+    
 
-    cramer_MgCa.loc[cramer_MgCa['Species']==species, 'BWT_reduct']=Mg_to_BWT(cramer_MgCa.loc[cramer_MgCa['Species']==species, 'Mg/Ca'])
-    cramer_MgCa.loc[cramer_MgCa['Species']==species, 'BWT_reduct']=Mg_to_BWT(cramer_MgCa.loc[cramer_MgCa['Species']==species, 'Mg/Ca adj'])
-
-    Lear_MgCa_form.loc[Lear_MgCa_form['Species']==species, 'BWT_reduct']=Mg_to_BWT(Lear_MgCa_form.loc[Lear_MgCa_form['Species']==species, 'Mg/Ca_adj'])
-
+foram_df_Mg['BWT_sc'] = foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg_species_corrected'), axis=1)
+foram_df_Mg['BWT_reduct']=foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg_cleaning_corrected'), axis=1)
+foram_df_Mg['BWT'] = foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg24'), axis=1)
+Lear_df['BWT_reduct']=Lear_df.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca_adj'), axis=1)
+cramer_MgCa['BWT_reduct']=cramer_MgCa.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca adj'), axis=1)
 
 
 foram_df_BWT=foram_df_Mg.dropna(subset=['BWT'])
 
+
+#chuck all the data together
+
+df=Lear_df.copy()
+
+df.rename(columns={'Age (Ma)':'age_Ma', 'Mg/Ca_adj':'Mg24', 'Species':'species_simple', 
+                   'BWT_reduct':'BWT'}, inplace=True)
+df['reference']='Lear'
+
+
+df1=foram_df_Mg.copy()
+df1['reference']='StA'
+vars=['age_Ma', 'ocean_basin', 'species_simple', 'Mg24', 'BWT', 'reference']
+
+df2=cramer_MgCa.copy()
+df2.rename(columns={'Age':'age_Ma', 'Mg/Ca adj':'Mg24', 'Species':'species_simple', 
+                   'BWT_reduct':'BWT', 'Reference':'reference'}, inplace=True)
+
+df2=df2.loc[~df2['Site'].isin(['ODP0926', 'ODP0806', 'DSDP522', 'ODP0689', 'DSDP573'])]
+
+full_data=pd.concat([df1.loc[:, vars], df.loc[:, vars], df2.loc[:, vars]], axis=0)
+
 foram_df_BWT_Owullmund=foram_df_BWT.loc[foram_df_BWT['species_simple'].isin(['Cibicidoides mundulus', 'Cibicidoides wuellerstorfi', 'Oridorsalis umbonatus'])]
 foram_df_BWT_other=foram_df_BWT.loc[~foram_df_BWT['species_simple'].isin(['Cibicidoides mundulus', 'Cibicidoides wuellerstorfi', 'Oridorsalis umbonatus'])]
 
+
+
 ## plot with Meckler data showing the correction
-fig, ax =plt.subplots(figsize=(8, 16), nrows=4, sharex=True)
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='s',
+fig, ax =plt.subplots(figsize=(8, 12), nrows=4, sharex=True)
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='s',
                 label='Meckler et al. (2022) clumped isotopes', ax=ax[0], legend=False)
 ax[0].set_ylabel('Clumped isotopes ($^{\circ}$C)')
 counter=1
@@ -281,7 +321,7 @@ fig.savefig(fig_path/'BWT_1.png', dpi=300)
 ## plot with Meckler data on same axis
 hue_order=['Atlantic', 'Pacific', 'Southern']
 fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^',
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black')
 p4=sns.lineplot(data=cramer_temp, x='Age', y='Temperature', color='firebrick', 
                 label=r'Cramer et al. (2016) $\delta^{18}$O', ax=ax)
@@ -303,10 +343,12 @@ ax.set_ylabel('Temperature ($^{\circ}$C)')
 ax.set_xlabel('Age (Ma)')                
 fig.savefig(fig_path/'BWT_2.png', dpi=300)
 
+
+
 ## plot with Meckler data on same axis using reductive correction
 hue_order=['Atlantic', 'Pacific', 'Southern']
 fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^',
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black')
 p4=sns.lineplot(data=cramer_temp, x='Age', y='Temperature', color='grey', 
                 label=r'Cramer et al. (2016) $\delta^{18}$O', ax=ax)
@@ -331,16 +373,28 @@ fig.savefig(fig_path/'BWT_2_reductive.png', dpi=300)
 
 
 
+## plot of Mg/Ca_foram !!!
+fig, ax =plt.subplots(figsize=(10, 8), nrows=3, sharex=True, height_ratios=[2, 1, 1])
+p1=sns.scatterplot(data=foram_df_Mg, x='age_Ma', y='Mg24', hue='species_simple', palette='Set2', ax=ax[0])
+p2=sns.lineplot(data=foram_df_Mg, x='age_Ma', y='Mg/Ca_sw', ax=ax[1], color='black', label='Mg/Ca_sw', 
+             legend=False)
+p3=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
+                label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black', ax=ax[2])
+ax[1].invert_xaxis()
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
+ax[0].set_ylabel('Mg/Ca (mmol/mol)')
+ax[1].set_ylabel('Mg/Ca (mmol/mol)')
+ax[1].invert_yaxis()
+ax[2].set_ylabel('Temperature ($^{\circ}$C)')
+ax[2].set_xlabel('Age (Ma)')
+ax[0].legend(ncol=2)
 
 
 
-
-
-
-## plot with Meckler data on same axis with Mg_sw
+## plot with Meckler data on same axis with Mg_sw !!!
 hue_order=['Atlantic', 'Pacific', 'Southern']
-fig, ax =plt.subplots(figsize=(10, 10), nrows=2, sharex=True, height_ratios=[2, 1])
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^',
+fig, ax =plt.subplots(figsize=(10, 10), nrows=2, sharex=True, height_ratios=[3, 1])
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black', ax=ax[0])
 p4=sns.lineplot(data=cramer_temp, x='Age', y='Temperature', color='firebrick', 
                 label=r'Cramer et al. (2016) $\delta^{18}$O', ax=ax[0])
@@ -354,15 +408,13 @@ ax[0].plot([], [], marker='P', color='black', label='Other (corrected to C. mund
 ax[0].legend(loc='upper right', fontsize=8, ncol=2)
 ax[0].set_ylabel('BWT ($^{\circ}$C)')
 ax[0].set_ylim(-3, 21)   
-
 sns.lineplot(data=foram_df_Mg, x='age_Ma', y='Mg/Ca_sw', ax=ax[1], color='black', label='Mg/Ca_sw', 
              legend=False)
 ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/kg)') 
-
 ax[1].set_xlabel('Age (Ma)')     
 ax[1].set_xlim(0, 65)
 ax[1].invert_xaxis()
-plt.subplots_adjust(hspace=-0.3)
+ax[1].invert_yaxis()
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 fig.savefig(fig_path/'BWT_Mg_sw.png', dpi=300)
 
@@ -370,12 +422,12 @@ fig.savefig(fig_path/'BWT_Mg_sw.png', dpi=300)
 
 
 
-
+## Lear data !!!
 fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^',
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes', 
                 mfc='white', mec='black', ax=ax)
-sns.scatterplot(data=Lear_MgCa_form, x='Age (Ma)', y='BWT_reduct', 
+sns.scatterplot(data=Lear_df, x='Age (Ma)', y='BWT_reduct', 
                 hue='ocean_basin', style='Species', palette='Set2', ax=ax)
 ax.set_xlim(0, 65)
 ax.invert_xaxis()
@@ -387,12 +439,14 @@ fig.savefig(fig_path/'Lear_BWT.png', dpi=300)
 
 Lear_MgCa_form_Atl=Lear_MgCa_form.loc[Lear_MgCa_form['ocean_basin']=='Atlantic']
 
+
+## Cramer data !!!
 fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^',
+p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes',
                 mfc='white', mec='black', ax=ax)
 sns.scatterplot(data=cramer_MgCa, x='Age', y='BWT_reduct', 
-                hue='ocean_basin', style='Species', palette='Set2', ax=ax)
+                hue='ocean_basin', style='Species', palette='Set2', ax=ax, legend=False)
 ax.set_xlim(0, 65)
 ax.invert_xaxis()
 ax.set_xlabel('Age (Ma)')
@@ -401,39 +455,56 @@ plt.title('Cramer data')
 fig.savefig(fig_path/'Cramer_BWT.png', dpi=300)
 
 
-
 cramer_MgCa_Atl=cramer_MgCa.loc[cramer_MgCa['ocean_basin']=='Atlantic']
 
 
-## smooth temp data
-# Assuming temp_df is your DataFrame and it has columns 'age_Ma', 'temp_c', and 'err'
-# temp_df = pd.DataFrame({'age_Ma': ..., 'temp_c': ..., 'err': ...})
+
+
+## smooth temp data !!!
+# Assuming meckler_df is your DataFrame and it has columns 'age_Ma', 'temp_c', and 'err'
+# meckler_df = pd.DataFrame({'age_Ma': ..., 'temp_c': ..., 'err': ...})
 
 # Create a loess fit
-lowess = sm.nonparametric.lowess(temp_df['temp_c'], temp_df['age_Ma'], frac=0.2, it=3, delta=0.0, is_sorted=False, missing='drop', return_sorted=True)
+lowess = sm.nonparametric.lowess(meckler_df['temp_c'], meckler_df['age_Ma'], frac=0.2, it=3, delta=0.0, is_sorted=False, missing='drop', return_sorted=True)
 # Create a new DataFrame with the results
 lowess_df = pd.DataFrame(lowess, columns=['age_Ma', 'temp_c_smooth'])
 # Merge the original data with the lowess smoothed data
-merged_df = pd.merge(temp_df, lowess_df, on='age_Ma')
+merged_df = pd.merge(meckler_df, lowess_df, on='age_Ma')
 # Plot the original data
-plt.errorbar(merged_df['age_Ma'], merged_df['temp_c'], yerr=merged_df['err'], linestyle='None', marker='o')
+
+fig, ax =plt.subplots(figsize=(10, 8))
+ax.errorbar(merged_df['age_Ma'], merged_df['temp_c'], yerr=merged_df['err'], linestyle='None', marker='o')
 # Plot the smoothed data
-plt.plot(merged_df['age_Ma'], merged_df['temp_c_smooth'], color='red')
-plt.show()
+ax.plot(merged_df['age_Ma'], merged_df['temp_c_smooth'], color='red')
+ax.set_xlabel('Age (Ma)')
+ax.set_ylabel('Temperature ($^{\circ}$C)')
+ax.invert_xaxis()
+plt.legend(['Smoothed', 'Original'])
+plt.title('Meckler et al. (2022) clumped isotopes')
 
 
 #interpolate onto foram data
 foram_df_Mg['temp_c_smooth']=np.nan
-foram_df_Mg['temp_c_smooth']=np.interp(foram_df_Mg['age_Ma'], temp_df['age_Ma'], lowess_df['temp_c_smooth'])
+foram_df_Mg['temp_c_smooth']=np.interp(foram_df_Mg['age_Ma'], meckler_df['age_Ma'], lowess_df['temp_c_smooth'])
+
+full_data['temp_c_smooth']=np.nan
+full_data['temp_c_smooth']=np.interp(full_data['age_Ma'], meckler_df['age_Ma'], lowess_df['temp_c_smooth'])
+
+full_data['Mg/Ca_sw']=np.nan    
+full_data['Mg/Ca_sw']=np.interp(full_data['age_Ma'], MgCasw_df['age'], MgCasw_df['MgCa_sw'])
+
+full_data.reset_index(drop=True, inplace=True)
 
 
 foram_df_Mg_cibs=foram_df_Mg.loc[foram_df_Mg['species_simple'].str.contains('Cibicidoides')]
-fig, ax =plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='Mg_species_corrected', hue='ocean_basin', ax=ax)
+
+full_data_cibs=full_data.loc[full_data['species_simple'].str.contains('Cibicidoides')]
 
 
 
-## fit Lear models to Cibs linear
+
+
+## fit Lear models to Cibs linear (not very good) !!!
 
 from scipy.optimize import curve_fit
 
@@ -458,14 +529,14 @@ def lin_fit_predict(X, c, m, H):
 foram_df_Mg_cibs=foram_df_Mg.loc[foram_df_Mg['species_simple'].str.contains('Cibicidoides')]
 
 xdata=(foram_df_Mg_cibs['Mg/Ca_sw'], foram_df_Mg_cibs['temp_c_smooth'].values)
-ydata=foram_df_Mg_cibs['Mg_species_corrected'].values
+ydata=foram_df_Mg_cibs['Mg24'].values
 
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 
-xdata_predict=(foram_df_Mg_cibs['Mg_species_corrected'], foram_df_Mg_cibs['Mg/Ca_sw'])
+xdata_predict=(foram_df_Mg_cibs['Mg24'], foram_df_Mg_cibs['Mg/Ca_sw'])
 foram_df_Mg_cibs['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
 
-x_predict=np.linspace(foram_df_Mg_cibs['Mg_species_corrected'].min(), foram_df_Mg_cibs['Mg_species_corrected'].max())
+x_predict=np.linspace(foram_df_Mg_cibs['Mg24'].min(), foram_df_Mg_cibs['Mg24'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
 ypredict_3=lin_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
 ypredict_4=lin_fit_predict((x_predict, np.array([4]*len(x_predict))), *parameters)
@@ -473,7 +544,7 @@ ypredict_5=lin_fit_predict((x_predict, np.array([5]*len(x_predict))), *parameter
 
 
 fig, ax =plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_Mg_cibs, y='temp_c_smooth', x='Mg_species_corrected', hue='Mg/Ca_sw', ax=ax)
+sns.scatterplot(data=foram_df_Mg_cibs, y='temp_c_smooth', x='Mg24', hue='Mg/Ca_sw', ax=ax)
 plt.plot(x_predict, ypredict_2, label='Mg/Ca_sw=2')
 plt.plot(x_predict, ypredict_3 ,label='Mg/Ca_sw=3')
 plt.plot(x_predict, ypredict_4, label='Mg/Ca_sw=4')
@@ -482,7 +553,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -491,6 +562,7 @@ ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
 ax[1].set_xlabel('Age (Ma)')
 ax[1].set_xlim(0, 65)
 ax[1].invert_xaxis()
+ax[1].invert_yaxis()
 fig.suptitle('Cibs only. Lear et al., 2015, linear')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
@@ -499,14 +571,81 @@ parameters_dict={'Lear_linear_Cibs':parameters}
 
 
 
+## include all data !!!
 
+full_data_cibs.dropna(subset=['Mg24'], inplace=True)
+
+xdata=(full_data_cibs['Mg/Ca_sw'], full_data_cibs['temp_c_smooth'].values)
+ydata=full_data_cibs['Mg24'].values
+
+parameters, covariance = curve_fit(lin_fit, xdata, ydata)
+
+xdata_predict=(full_data_cibs['Mg24'], full_data_cibs['Mg/Ca_sw'])
+full_data_cibs['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
+
+x_predict=np.linspace(full_data_cibs['Mg24'].min(), full_data_cibs['Mg24'].max())
+ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
+ypredict_3=lin_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
+ypredict_4=lin_fit_predict((x_predict, np.array([4]*len(x_predict))), *parameters)
+ypredict_5=lin_fit_predict((x_predict, np.array([5]*len(x_predict))), *parameters)
+
+
+fig, ax =plt.subplots(figsize=(10, 8))
+sns.scatterplot(data=full_data_cibs, y='temp_c_smooth', x='Mg24', hue='Mg/Ca_sw', ax=ax)
+plt.plot(x_predict, ypredict_2, label='Mg/Ca_sw=2')
+plt.plot(x_predict, ypredict_3 ,label='Mg/Ca_sw=3')
+plt.plot(x_predict, ypredict_4, label='Mg/Ca_sw=4')
+plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
+plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
-sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='Mg_species_corrected', 
-                hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[1])
-make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
+sns.scatterplot(data=full_data_cibs, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
 ax[1].invert_xaxis()
+ax[1].invert_yaxis()
+fig.suptitle('Cibs only. Lear et al., 2015, linear')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
+
+
+
+
+## Put all together
+
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=3, sharex=True, height_ratios=[2, 2, 1])
+
+sns.scatterplot(data=full_data_cibs, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+
+
+sns.scatterplot(data=full_data_cibs, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[1], 
+                legend=False)
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[1])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[1], linestyle='--')
+
+
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[2])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel('BWT ($^{\circ}$C)')
+ax[2].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[2].set_xlabel('Age (Ma)')
+ax[2].set_xlim(0, 65)
+ax[2].invert_xaxis()
+ax[2].invert_yaxis()
+ax[0].legend(loc='upper right')
+fig.suptitle('Cibs only. All data. Original Lear fit and refit to clumped data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
+
 
 ## fit Lear models to Cibs exponential
 
@@ -530,7 +669,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_Mg_cibs, x='age_Ma', y='BWT_expo', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -570,7 +709,7 @@ Lear_concat_df['species_simple']=Lear_MgCa_form['Species']
 Lear_concat_df['ocean_basin']=Lear_MgCa_form['ocean_basin']
 Lear_concat_df['source']='Lear et al. (2015)'
 Lear_concat_df['temp_c_smooth']=np.nan  
-Lear_concat_df['temp_c_smooth']=np.interp(Lear_concat_df['age_Ma'], temp_df['age_Ma'], lowess_df['temp_c_smooth'])
+Lear_concat_df['temp_c_smooth']=np.interp(Lear_concat_df['age_Ma'], meckler_df['age_Ma'], lowess_df['temp_c_smooth'])
 Lear_concat_df['Mg_sw']=np.interp(Lear_concat_df['age_Ma'], Mg_df['age'], Mg_df['median'])
 Lear_concat_df['Ca_sw']=np.interp(Lear_concat_df['age_Ma'], Ca_df['age'], Ca_df['median'])
 Lear_concat_df['Mg/Ca_sw']=Lear_concat_df['Mg_sw']/Lear_concat_df['Ca_sw']
@@ -619,7 +758,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT_lin_wLear', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -664,7 +803,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_cibs, x='age_Ma', y='BWT_expo_wLear', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -698,7 +837,7 @@ foram_df_wLear_cibs_OLS['BWT_OLS']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='BWT_OLS', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -726,7 +865,7 @@ ax.invert_xaxis()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='BWT_OLS', hue='Li7', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -754,7 +893,7 @@ foram_df_Mg_cibs_OLS['BWT_OLS_Li7']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_Mg_cibs_OLS, x='age_Ma', y='BWT_OLS_Li7', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -771,25 +910,25 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 parameters_dict['OLS_Cibs_wLi7']=parameters
 
 
-## Oridorsalis umbonatus calibration
+## Oridorsalis umbonatus calibration !!!
 
 
 foram_df_Orid=foram_df_Mg.loc[foram_df_Mg['species_simple']=='Oridorsalis umbonatus']
 fig, ax =plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='Mg_species_corrected', ax=ax, hue='ocean_basin')
+sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='Mg24', ax=ax, hue='ocean_basin')
 ax.set_xlim(0, 65)
 ax.invert_xaxis()
 
 
 xdata=(foram_df_Orid['Mg/Ca_sw'], foram_df_Orid['temp_c_smooth'].values)
-ydata=foram_df_Orid['Mg_species_corrected'].values
+ydata=foram_df_Orid['Mg24'].values
 
 parameters, covariance = curve_fit(lin_fit, xdata, ydata)
 
-xdata_predict=(foram_df_Orid['Mg_species_corrected'], foram_df_Orid['Mg/Ca_sw'])
+xdata_predict=(foram_df_Orid['Mg24'], foram_df_Orid['Mg/Ca_sw'])
 foram_df_Orid['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
 
-x_predict=np.linspace(foram_df_Orid['Mg_species_corrected'].min(), foram_df_Orid['Mg_species_corrected'].max())
+x_predict=np.linspace(foram_df_Orid['Mg24'].min(), foram_df_Orid['Mg24'].max())
 ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
 ypredict_3=lin_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
 ypredict_4=lin_fit_predict((x_predict, np.array([4]*len(x_predict))), *parameters)
@@ -797,7 +936,7 @@ ypredict_5=lin_fit_predict((x_predict, np.array([5]*len(x_predict))), *parameter
 
 
 fig, ax =plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_Orid, y='temp_c_smooth', x='Mg_species_corrected', hue='Mg/Ca_sw', ax=ax)
+sns.scatterplot(data=foram_df_Orid, y='temp_c_smooth', x='Mg24', hue='Mg/Ca_sw', ax=ax)
 plt.plot(x_predict, ypredict_2, label='Mg/Ca_sw=2')
 plt.plot(x_predict, ypredict_3 ,label='Mg/Ca_sw=3')
 plt.plot(x_predict, ypredict_4, label='Mg/Ca_sw=4')
@@ -806,7 +945,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -820,6 +959,101 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
 parameters_dict['Lear_linear_Oridisalis']=parameters
+
+
+
+
+
+## with all data !!! nice!
+
+
+full_data_orids=full_data.loc[full_data['species_simple']=='Oridorsalis umbonatus']
+
+full_data_orids.dropna(subset=['Mg24'], inplace=True)
+
+fig, ax =plt.subplots(figsize=(10, 8))
+sns.scatterplot(data=full_data_orids, x='age_Ma', y='Mg24', ax=ax, hue='ocean_basin')
+ax.set_xlim(0, 65)
+ax.invert_xaxis()
+
+
+xdata=(full_data_orids['Mg/Ca_sw'], full_data_orids['temp_c_smooth'].values)
+ydata=full_data_orids['Mg24'].values
+
+parameters, covariance = curve_fit(lin_fit, xdata, ydata)
+
+xdata_predict=(full_data_orids['Mg24'], full_data_orids['Mg/Ca_sw'])
+full_data_orids['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
+
+x_predict=np.linspace(full_data_orids['Mg24'].min(), full_data_orids['Mg24'].max())
+ypredict_2=lin_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
+ypredict_3=lin_fit_predict((x_predict, np.array([3]*len(x_predict))), *parameters)
+ypredict_4=lin_fit_predict((x_predict, np.array([4]*len(x_predict))), *parameters)
+ypredict_5=lin_fit_predict((x_predict, np.array([5]*len(x_predict))), *parameters)
+
+
+fig, ax =plt.subplots(figsize=(10, 8))
+sns.scatterplot(data=full_data_orids, y='temp_c_smooth', x='Mg24', hue='Mg/Ca_sw', ax=ax)
+plt.plot(x_predict, ypredict_2, label='Mg/Ca_sw=2')
+plt.plot(x_predict, ypredict_3 ,label='Mg/Ca_sw=3')
+plt.plot(x_predict, ypredict_4, label='Mg/Ca_sw=4')
+plt.plot(x_predict, ypredict_5,label='Mg/Ca_sw=5')
+plt.legend()
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=full_data_orids, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
+ax[1].invert_xaxis()
+ax[1].invert_yaxis()
+fig.suptitle('Oridisalis only. Lear et al., 2015, refit to all data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.5)
+
+
+
+
+
+## Put all together
+
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=3, sharex=True, height_ratios=[2, 2, 1])
+
+sns.scatterplot(data=full_data_orids, x='age_Ma', y='BWT', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+
+
+sns.scatterplot(data=full_data_orids, x='age_Ma', y='BWT_lin', hue='ocean_basin', ax=ax[1], 
+                legend=False)
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[1])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[1], linestyle='--')
+
+
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[2])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel('BWT ($^{\circ}$C)')
+ax[2].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[2].set_xlabel('Age (Ma)')
+ax[2].set_xlim(0, 65)
+ax[2].invert_xaxis()
+ax[2].invert_yaxis()
+ax[0].legend(loc='upper right')
+fig.suptitle('Oridisalis only. All data. Original Lear fit and refit to clumped data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
+
+
+
+
+
+
 
 ## With Lear data
 
@@ -850,7 +1084,7 @@ plt.legend()
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT_lin_wLear', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -883,7 +1117,7 @@ foram_df_wLear_Orid['BWT_OLS']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_wLear_Orid, x='age_Ma', y='BWT_OLS', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -915,7 +1149,7 @@ foram_df_Orid['BWT_OLS_Li7']=predictions
 
 fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
 sns.scatterplot(data=foram_df_Orid, x='age_Ma', y='BWT_OLS_Li7', hue='ocean_basin', ax=ax[0])
-sns.lineplot(data=temp_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
 sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
              ax=ax[0], linestyle='--')
 sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
@@ -931,43 +1165,177 @@ parameters_dict['OLS_Oridisalis_wLi7']=parameters
 
 
 
+## ML
+
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler
 
 
-## summary plot
+full_data['species']=full_data['species_simple'].copy()
+full_data['species']=np.where(full_data['species_simple'].str.contains('Cibicidoides'), 'Cibicidoides sp', full_data['species'])
+full_data['species']=np.where(full_data['species_simple'].str.contains('mundulus'), 'C. mundulus', full_data['species'])
+full_data['species']=np.where(full_data['species_simple'].str.contains('Oridorsalis umbonatus'), 'O. umbonatus', full_data['species'])
 
-
-
-
-
-
-
-
-
-## add cramer data
-
-#remove 926, 690 and 806 to prevent overlap with Lear
-Lear_cores=['ODP0926', 'ODP0690', 'ODP0806']
-cramer_MgCa_noLear=cramer_MgCa.loc[~cramer_MgCa['Site'].isin(Lear_cores)]  
-
-cramer_MgCa_noLear.rename(columns={'Age':'age_Ma', 'Mg/Ca':'Mg24', 
-                                   'Species':'species_simple', 'Site':'core'}, inplace=True)
-
-cramer_MgCa_noLear['Mg_species_corrected']=cramer_MgCa_noLear['Mg24']
-
-cramer_MgCa_noLear_umbwuelmun=cramer_MgCa_noLear.loc[cramer_MgCa_noLear['species_simple'].isin(['Cibicidoides mundulus', 'Cibicidoides wuellerstorfi', 'Oridorsalis umbonatus'])]
-
-cramer_MgCa_noLear_umbwuelmun['source']='Cramer et al. (2011)'
-
-foram_df_wLear_wcramer=pd.concat([foram_df_wLear, cramer_MgCa_noLear_umbwuelmun], axis=0)
+full_data_ML=full_data.loc[full_data['species'].isin(['Cibicidoides sp', 'C. mundulus', 'O. umbonatus'])]
 
 
 
+full_data_ML.dropna(subset=['Mg24'], inplace=True)
+full_data_ML2=full_data_ML.copy()
 
-fig, ax =plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_wLear_wcramer, x='age_Ma', y='Mg_species_corrected', 
-                hue='species_simple', ax=ax, style='source')
-plt.legend(ncol=2)
+#make dummies
+full_data_ML=pd.get_dummies(full_data_ML, columns=['species', 'ocean_basin'], drop_first=True)
 
 
+#scale data
+scaler=StandardScaler()
+full_data_ML[['Mg/Ca_sw', 'Mg24']]=scaler.fit_transform(full_data_ML[['Mg/Ca_sw', 'Mg24']])
+
+features=['Mg/Ca_sw', 'Mg24', 'species_Cibicidoides sp', 'species_O. umbonatus', 'ocean_basin_Pacific', 'ocean_basin_Southern', 'ocean_basin_Indian']
+#split data
+X_train, X_test, y_train, y_test=train_test_split(full_data_ML[features].values, 
+                                                  full_data_ML['temp_c_smooth'].values, test_size=0.3, random_state=42)
+
+
+model=LinearRegression()
+model.fit(X_train, y_train)
+predictions=model.predict(X_test)
+mean_squared_error(y_test, predictions)
+
+
+#plot predictions
+full_data_ML['temp_predict']=model.predict(full_data_ML[features].values)
+
+full_data_ML['ocean_basin']=full_data_ML2['ocean_basin'].copy()
+
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=full_data_ML, x='age_Ma', y='temp_predict', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
+ax[1].invert_xaxis()
+ax[1].invert_yaxis()
+fig.suptitle('Oridisalis only. Lear et al., 2015, refit to all data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.5)
+
+
+
+
+
+## Random forest
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
+params_dt = {'max_depth': [3, 4, 5, 6], 
+             'min_samples_leaf':[0.04, 0.06, 0.08], 
+             'max_features':[0.2, 0.4, 0.6, 0.8], 
+             'n_estimators':[100, 200, 300]}
+
+grid_rf=GridSearchCV(estimator=RandomForestRegressor(random_state=42), 
+                     param_grid=params_dt, cv=3, n_jobs=-1, verbose=1)
+
+
+
+grid_rf.fit(X_train, y_train)
+
+best_hyperparams = grid_rf.best_params_
+
+best_CV_score = grid_rf.best_score_
+
+predictions=grid_rf.predict(X_test)
+mean_squared_error(y_test, predictions)
+
+full_data_ML['temp_predict_RF']=grid_rf.predict(full_data_ML[features].values)
+
+
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=full_data_ML, x='age_Ma', y='temp_predict_RF', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
+ax[1].invert_xaxis()
+ax[1].invert_yaxis()
+fig.suptitle('Oridisalis only. Lear et al., 2015, refit to all data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.5)
+
+
+
+
+
+
+## Random forest cibs only, fit atlantic data
+
+
+full_data_ML=full_data.loc[full_data['species'].isin(['Cibicidoides sp', 'C. mundulus', 'O. umbonatus'])]
+full_data_ML.dropna(subset=['Mg24'], inplace=True)
+full_data_ML2=full_data_ML.copy()
+#make dummies
+full_data_ML=pd.get_dummies(full_data_ML, columns=['species', 'ocean_basin'], drop_first=True)
+
+full_data_ML['Mg24_ln']=np.log(full_data_ML['Mg24'])
+#scale data
+scaler=StandardScaler()
+full_data_ML[['Mg/Ca_sw', 'Mg24_ln']]=scaler.fit_transform(full_data_ML[['Mg/Ca_sw', 'Mg24_ln']])
+
+features=['Mg/Ca_sw', 'Mg24_ln', 'species_Cibicidoides sp', 'species_O. umbonatus', 'ocean_basin_Pacific', 'ocean_basin_Southern', 'ocean_basin_Indian']
+#split data
+X_train, X_test, y_train, y_test=train_test_split(full_data_ML[features].values, 
+                                                  full_data_ML['temp_c_smooth'].values, test_size=0.3, random_state=42)
+
+
+
+grid_rf=GridSearchCV(estimator=RandomForestRegressor(random_state=42), 
+                     param_grid=params_dt, cv=3, n_jobs=-1, verbose=1)
+
+
+
+X_train, X_test, y_train, y_test=train_test_split(full_data_ML[features].values, 
+                                                  full_data_ML['temp_c_smooth'].values, test_size=0.3, random_state=42)
+
+
+grid_rf.fit(X_train, y_train)
+
+best_hyperparams = grid_rf.best_params_
+
+best_CV_score = grid_rf.best_score_
+
+predictions=grid_rf.predict(X_test)
+mean_squared_error(y_test, predictions)
+
+full_data_ML['temp_predict_RF']=grid_rf.predict(full_data_ML[features].values)
+
+
+full_data_ML['ocean_basin']=full_data_ML2['ocean_basin'].copy()
+
+
+
+fig, ax =plt.subplots(figsize=(10, 8), nrows=2, sharex=True, height_ratios=[2, 1])
+sns.scatterplot(data=full_data_ML, x='age_Ma', y='temp_predict_RF', hue='ocean_basin', ax=ax[0])
+sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^', ax=ax[0])
+sns.lineplot(data=merged_df, x='age_Ma', y='temp_c_smooth', color='black', 
+             ax=ax[0], linestyle='--')
+sns.lineplot(data=MgCasw_df, x='age', y='MgCa_sw', color='red', ax=ax[1])
+ax[0].set_ylabel('BWT ($^{\circ}$C)')
+ax[1].set_ylabel(r'Mg/Ca$_{sw}$ ($\mu$mol/mol)')
+ax[1].set_xlabel('Age (Ma)')
+ax[1].set_xlim(0, 65)
+ax[1].invert_xaxis()
+ax[1].invert_yaxis()
+fig.suptitle('Oridisalis only. Lear et al., 2015, refit to all data')
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.5)
 
 
