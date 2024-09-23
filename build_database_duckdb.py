@@ -9,7 +9,7 @@ import duckdb
 
 
 
-#Add column with FK to table
+#Add column with FK to table UNFINISHED
 def add_fk(table, column, fk_table, fk_column):
     
     #find the constraints of the current table
@@ -41,9 +41,11 @@ def add_fk(table, column, fk_table, fk_column):
     query=f"""ALTER TABLE {table}
     ADD FOREIGN KEY ({column})
     REFERENCES {fk_table} ({fk_column})"""
-    duckdb.sql(query
+    duckdb.sql(query)
 
 
+
+## paths
 #define paths
 data_path=Path(os.getcwd())/"data"
 database_path=Path(os.getcwd())/"foram_database"
@@ -54,7 +56,7 @@ foram_df=pd.read_csv(master_file, index_col=0)
 
 
 # Connect to an in-memory DuckDB database
-conn = duckdb.connect(database=':memory:')
+conn = duckdb.connect(database=str(database_path/"foram_database.db"))
 
 # Load master data into a table
 query = f""" CREATE TABLE master AS
@@ -136,6 +138,9 @@ duckdb.sql("""INSERT INTO boron_isotopes (core_id, species, d11B, d11B_2se)
                 SELECT core AS core_id, species, d11B, d11B_2SE AS d11B_2se
                 FROM master
                 WHERE d11B IS NOT NULL OR d11B_2se IS NOT NULL""")
+
+
+## sample_info_table (age models)
 
 #setup age_models table
 duckdb.sql("""CREATE SEQUENCE age_model_id_sequence START 1;
