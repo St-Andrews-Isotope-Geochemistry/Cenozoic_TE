@@ -11,4 +11,4 @@
 #ignore geochemistry-helpers package
 geochemistry-helpers/
 #ignore agilent df
-archive_cleaned_240923.csv
+#archive_cleaned_240923.csv
