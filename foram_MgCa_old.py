@@ -111,7 +111,7 @@ def make_stacked_plot(fig, ax, epoch_lines=True, adjust=0):
     fig.subplots_adjust(hspace=adjust)
 
 
-#make Cenozoic epoch boundaries dict
+#make Cenozoic epoch boundaries dict for plotting
 epoch_boundaries={'Paleocene':(65.5, 55.8), 
                   'Eocene':(55.8, 33.9), 
                   'Oligocene':(33.9, 23.0), 
@@ -127,28 +127,29 @@ fig_path=Path(os.getcwd())/"figures"
 
 ## data wrangling
 
-#import data
-foram_df=pd.read_csv(data_path/"foram_database_240923-1419.csv", index_col=0)
+
+#Meckler clumped isotopes
 meckler_df=pd.read_csv(data_path/"Meckler2022_temp.csv")
+meckler_df.dropna(subset=['temp_c'], inplace=True)
+meckler_df.sort_values('age_Ma', inplace=True)
 
-
+#Seawater Ca and Mg data (Ross)
 Ca_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='calcium')
 Mg_df=pd.read_excel(data_path/"calcium_magnesium.xlsx", sheet_name='magnesium')
 MgCasw_df=Ca_df.merge(Mg_df, on='age', suffixes=('_Ca', '_Mg'))
 MgCasw_df['MgCa_sw']=MgCasw_df['median_Mg']/MgCasw_df['median_Ca']
-cramer_temp=pd.read_csv(data_path/"Cramer_temp_d18O.csv")
-cramer_MgCa=pd.read_csv(data_path/"Cramer_MgCa.csv")
-Lear_MgCa=pd.read_csv(data_path/"Lear2015.csv")
-Lear_2000=pd.read_csv(data_path/"Lear2000.csv")
 
-#format data
+#foram data
+foram_df=pd.read_csv(data_path/"foram_database_240923-1419.csv", index_col=0)
 foram_df['DeltaCO3']=foram_df['CO3']-foram_df['CO3']/foram_df['omega_logfit']
 foram_df_Mg=foram_df.loc[pd.notnull(foram_df['Mg24'])]
 foram_df_Mg['Mg/Ca_sw']=foram_df_Mg['Mg_sw']/foram_df_Mg['Ca_sw']
 
-meckler_df.dropna(subset=['temp_c'], inplace=True)
-meckler_df.sort_values('age_Ma', inplace=True)
 
+
+# Lear data
+Lear_MgCa=pd.read_csv(data_path/"Lear2015.csv")
+Lear_2000=pd.read_csv(data_path/"Lear2000.csv")
 
 Lear_MgCa_form=Lear_MgCa[['Sample ID', 'Age (Ma)']].copy()
 Lear_MgCa_form['Mg/Ca']=Lear_MgCa['O. umbonatus Mg/Ca'].copy()
@@ -168,9 +169,6 @@ wuell_df['Mg/Ca_adj']=wuell_df['Mg/Ca'].copy()
 wuell_df['Species']='Cibicidoides wuellerstorfi'
 Lear_MgCa_form=pd.concat([Lear_MgCa_form, wuell_df], axis=0)
 
-
-
-
 Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('690B'), 'ocean_basin']='Southern'
 Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('806'), 'ocean_basin']='Pacific'
 Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('926'), 'ocean_basin']='Atlantic'
@@ -178,6 +176,10 @@ Lear_MgCa_form.loc[Lear_MgCa_form['Sample ID'].str.contains('926'), 'ocean_basin
 Lear_df=pd.concat([Lear_MgCa_form, Lear_2000], axis=0)
 Lear_df['Mg/Ca_adj']=Lear_df['Mg/Ca'].copy()
 
+
+#Cramer data
+cramer_temp=pd.read_csv(data_path/"Cramer_temp_d18O.csv")
+cramer_MgCa=pd.read_csv(data_path/"Cramer_MgCa.csv")
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('926'), 'ocean_basin']='Atlantic'
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('806'), 'ocean_basin']='Pacific'
 cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('690'), 'ocean_basin']='Southern'
@@ -208,6 +210,11 @@ species_correct_Mg={'Cibicidoides havanensis':-0.4606, 'Cibicidoides grimsdalei'
                     'Cibicidoides eocaenus': -0.1039, 
                     'Cibicidoides mundulus':0.0, 'Cibicidoides wuellerstorfi':-0.180458,
                     'Oridorsalis umbonatus':0.0}
+
+
+
+
+
 
 
 foram_df_Mg=foram_df_Mg.loc[foram_df_Mg['species_simple'].isin(species_correct_Mg.keys())]
