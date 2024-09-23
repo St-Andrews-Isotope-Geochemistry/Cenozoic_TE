@@ -53,7 +53,7 @@ database_path=Path(os.getcwd())/"foram_database"
 master_file=data_path/"foram_dataframe_240625.csv"
 
 foram_df=pd.read_csv(master_file, index_col=0)
-database_path
+
 
 # Connect to an in-memory DuckDB database
 conn = duckdb.connect(database=str(database_path/"foram_database.db"))

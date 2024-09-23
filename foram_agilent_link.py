@@ -58,16 +58,20 @@ foram_df_boron['s_id_species']=foram_df_boron['sample_mix_id']+'_'+foram_df_boro
 
 
 
-archive_df=pd.read_csv(data_path/"bigdf_240226.csv", index_col=0)
+archive_df=pd.read_csv(data_path/"bigdf_240918.csv", index_col=0)
 archive_df['time']=pd.to_datetime(archive_df['time'], 
                                       dayfirst=True)
+
+
 archive_df=archive_df.reset_index(drop=True)
 
 
 archive_df['agilent_id']='STG'+archive_df['time'].dt.strftime('%Y%m%d%H%M')
 
+#remove duplicates
+archive_df=archive_df.drop_duplicates(subset=['agilent_id', 'isotope_gas', 'sample_name', 'time', 'run_name', 'run_order'], keep='first')
 
-
+archive_df.to_csv(data_path/"archive_cleaned_240923.csv")
 
 # Connect to an in-memory DuckDB database
 conn = duckdb.connect(database=':memory:')
@@ -75,7 +79,7 @@ conn = duckdb.connect(database=':memory:')
 #filter runs older than 2021
 query = f"""
 SELECT *
-FROM read_csv_auto('{data_path/"bigdf_240226.csv"}')
+FROM read_csv_auto('{data_path/"bigdf_240918.csv"}')
 WHERE time < '2021-01-01' AND time > '2019-12-12'
 """
 
@@ -221,18 +225,21 @@ for i, row in foram_df_boron.iterrows():
         foram_agilent_link=pd.concat([foram_agilent_link, s_df], axis=0)
         
 
+foram_agilent_link.drop_duplicates(inplace=True)
 
 
 
-
-foram_agilent_link.to_csv(data_path/"exact_agilent_matches.csv")
+foram_agilent_link.to_csv(data_path/"exact_agilent_matches_240923.csv")
     
 exact_matches=foram_agilent_link.copy()
+
 isotope=['B11', 'Mg24', 'Al27', 'Na23', 'Li7', 'Mg25', 'Ba138',  'U238', 'Cd111', 'Sr88', 'Nd146', 'Mn55']
 
 
 for iso in isotope:
     exact_matches[iso+'_foram']=foram_df_boron.loc[exact_matches.index, iso]
+
+
 
 
 for i, row in exact_matches.iterrows():
@@ -267,6 +274,14 @@ archive_df_unmatched=archive_df.loc[~archive_df['agilent_id'].isin(exact_matches
 archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('stg', case=False)]
 archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('8301f', case=False)]
 archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('stgcs', case=False)]
+archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('blk', case=False)]
+archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('cs1', case=False)]
+archive_df_unmatched=archive_df_unmatched.loc[~archive_df_unmatched['sample_name'].str.contains('8301c', case=False)]
+archive_df_unmatched_B=archive_df_unmatched.loc[archive_df_unmatched['isotope_gas'].str.contains('B11_No Gas')]
+
+archive_df_unmatched_B[['run_name', 'run_order', 'sample_name', 'time', 'agilent_id', 'brkt_stnd', 'isotope_gas', 'cali_single']].to_csv(data_path/"archive_df_unmatched_B.csv", index=False)
+
+foram_df_unmatched.to_csv(data_path/"foram_dataframe_240923_unmatched.csv")
 
 
 
