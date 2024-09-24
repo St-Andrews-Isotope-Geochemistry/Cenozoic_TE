@@ -10,3 +10,5 @@
 *.zip
 #ignore geochemistry-helpers package
 geochemistry-helpers/
+
+test_scripts/
