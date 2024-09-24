@@ -443,7 +443,6 @@ full_data_cibs=full_data.loc[full_data['species_simple'].str.contains('Cibicidoi
 ## Recreate the Lear 2015 model 
 
 from scipy.optimize import curve_fit
-from lmfit import Model
 # From Lear et al (2015)
 
 def expo_fit(X, A, H, B):
@@ -643,7 +642,8 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
 ## fit Lear models to Cibs exponential
 
 
-xdata=(foram_df_Mg_cibs['Mg/Ca_sw'], foram_df_Mg_cibs['temp_c_smooth'].values)
+xdata=(foram_df_Mg_cibs['Mg/Ca_sw'].values, foram_df_Mg_cibs['temp_c_smooth'].values)
+xdata_predict=(foram_df_Mg_cibs['Mg24'], foram_df_Mg_cibs['Mg/Ca_sw'])
 ydata=foram_df_Mg_cibs['Mg24'].values
 
 parameters, _ = curve_fit(expo_fit, xdata, ydata)
@@ -768,8 +768,6 @@ fig.suptitle('Cibs only. Lear et al., 2015, linear, w Lear data')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
-parameters_dict['Lear_linear_Cibs_wLearData']=parameters
-
 
 ## fit with +Lear data (Atl Cibs only) expo
 
@@ -813,8 +811,6 @@ fig.suptitle('Cibs only. Lear et al., 2015, exponential, w Lear data')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
-parameters_dict['Lear_expo_Cibs_wLearData']=parameters
-
 
 
 ## Use simple lin regress instead on Cibs
@@ -851,11 +847,6 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
 
-
-fig ,ax = plt.subplots(figsize=(10, 8))
-sns.scatterplot(data=foram_df_wLear_cibs_OLS, x='age_Ma', y='Mg_species_corrected', hue='Li7', ax=ax)
-ax.set_xlim(0, 65)
-ax.invert_xaxis()
 
 
 ## OLS with Li7 (no Lear data)
