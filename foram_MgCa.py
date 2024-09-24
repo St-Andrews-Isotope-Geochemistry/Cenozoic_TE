@@ -157,8 +157,8 @@ MgCasw_df['MgCa_sw']=MgCasw_df['median_Mg']/MgCasw_df['median_Ca']
 #foram data
 foram_df=pd.read_csv(data_path/"foram_database_240923-1419.csv", index_col=0)
 foram_df_Mg=foram_df.loc[pd.notnull(foram_df['Mg24'])]
-foram_df['Mg/Ca_sw']=np.nan
-foram_df['Mg/Ca_sw']=np.interp(foram_df['age_Ma'], MgCasw_df['age'], MgCasw_df['MgCa_sw'])
+foram_df_Mg['Mg/Ca_sw']=np.nan
+foram_df_Mg['Mg/Ca_sw']=np.interp(foram_df_Mg['age_Ma'], MgCasw_df['age'], MgCasw_df['MgCa_sw'])
 
 
 # Lear data
@@ -211,7 +211,22 @@ cramer_MgCa.loc[cramer_MgCa['Site'].str.contains('1209'), 'ocean_basin']='Pacifi
 
 
 
-
+## plot of Mg/Ca_foram with clumped isotope temperature data and Mg/Ca_sw
+fig, ax =plt.subplots(figsize=(10, 8), nrows=3, sharex=True, height_ratios=[2, 1, 1])
+p1=sns.scatterplot(data=foram_df_Mg, x='age_Ma', y='Mg24', hue='species_simple', palette='Set2', 
+                   ax=ax[0], style='ocean_basin')
+p2=sns.lineplot(data=foram_df_Mg, x='age_Ma', y='Mg/Ca_sw', ax=ax[1], color='black', label='Mg/Ca_sw', 
+             legend=False)
+p3=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
+                label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black', ax=ax[2])
+ax[1].invert_xaxis()
+make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
+ax[0].set_ylabel('Mg/Ca (mmol/mol)')
+ax[1].set_ylabel('Mg/Ca (mmol/mol)')
+ax[1].invert_yaxis()
+ax[2].set_ylabel('Temperature ($^{\circ}$C)')
+ax[2].set_xlabel('Age (Ma)')
+ax[0].legend(ncol=2, fontsize=8)
 
 
 ## Literature Mg/Ca to BWT conversions
@@ -241,6 +256,8 @@ sns.stripplot(data=foram_df_Mg, x='age_Ma', hue='species_simple',
               jitter=False, linewidth=1, marker="s")
 ax.set(ylabel=None)
 
+
+
 #correction that could be applied to samples to make them like reductively cleaned samples (C. Lear)
 cleaning_correct=0.909
 foram_df_Mg['Mg_cleaning_corrected']=foram_df_Mg['Mg24']*cleaning_correct
@@ -252,18 +269,16 @@ foram_df_Mg['Mg_cleaning_corrected']=foram_df_Mg['Mg24']*cleaning_correct
 foram_df_Mg['BWT_sc'] = foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg_species_corrected'), axis=1)
 foram_df_Mg['BWT_reduct']=foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg_cleaning_corrected'), axis=1)
 foram_df_Mg['BWT'] = foram_df_Mg.apply(lambda row: convert_Mg_to_BWT(row, 'species_simple', 'Mg24'), axis=1)
-Lear_df['BWT_reduct']=Lear_df.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca_adj'), axis=1)
-cramer_MgCa['BWT_reduct']=cramer_MgCa.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca adj'), axis=1)
+Lear_df['BWT']=Lear_df.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca'), axis=1)
+cramer_MgCa['BWT']=cramer_MgCa.apply(lambda row: convert_Mg_to_BWT(row, 'Species', 'Mg/Ca'), axis=1)
 
-
+#drop nans
 foram_df_BWT=foram_df_Mg.dropna(subset=['BWT'])
 
 
-#chuck all the data together
-
+#chuck all the data together from the different sources
 df=Lear_df.copy()
-df.rename(columns={'Age (Ma)':'age_Ma', 'Mg/Ca_adj':'Mg24', 'Species':'species_simple', 
-                   'BWT_reduct':'BWT'}, inplace=True)
+df.rename(columns={'Age (Ma)':'age_Ma', 'Mg/Ca':'Mg24', 'Species':'species_simple'}, inplace=True)
 df['reference']='Lear'
 
 
@@ -272,8 +287,8 @@ df1['reference']='StA'
 vars=['age_Ma', 'ocean_basin', 'species_simple', 'Mg24', 'BWT', 'reference']
 
 df2=cramer_MgCa.copy()
-df2.rename(columns={'Age':'age_Ma', 'Mg/Ca adj':'Mg24', 'Species':'species_simple', 
-                   'BWT_reduct':'BWT', 'Reference':'reference'}, inplace=True)
+df2.rename(columns={'Age':'age_Ma', 'Mg/Ca':'Mg24', 'Species':'species_simple', 
+                   'BWT':'BWT', 'Reference':'reference'}, inplace=True)
 
 df2=df2.loc[~df2['Site'].isin(['ODP0926', 'ODP0806', 'DSDP522', 'ODP0689', 'DSDP573'])]
 
@@ -284,7 +299,7 @@ foram_df_BWT_other=foram_df_BWT.loc[~foram_df_BWT['species_simple'].isin(['Cibic
 
 
 
-## plot with Meckler data showing the correction
+## plot with Meckler data showing the correction as a stacked plot
 fig, ax =plt.subplots(figsize=(8, 12), nrows=4, sharex=True)
 p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='s',
                 label='Meckler et al. (2022) clumped isotopes', ax=ax[0], legend=False)
@@ -319,80 +334,6 @@ fig.savefig(fig_path/'BWT_1.png', dpi=300)
 
 
 
-## plot with Meckler data on same axis
-hue_order=['Atlantic', 'Pacific', 'Southern']
-fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
-                label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black')
-p4=sns.lineplot(data=cramer_temp, x='Age', y='Temperature', color='firebrick', 
-                label=r'Cramer et al. (2016) $\delta^{18}$O', ax=ax)
-p2=sns.lineplot(data=foram_df_BWT_Owullmund, 
-                x='age_Ma', y='BWT', hue='ocean_basin', palette='Set2', markers=True, 
-                hue_order=hue_order, style='species_simple')
-p3=sns.scatterplot(data=foram_df_BWT_other, x='age_Ma', y='BWT', hue='ocean_basin', palette='Set2', 
-                   hue_order=hue_order, marker='P', legend=False)
-# manually add legend entry for other species using only the marker (not the hue)
-ax.plot([], [], marker='P', color='black', label='Other (corrected to C. mundulus)', ls='None')
-
-
-ax.set_xlim(0, 65)
-ax.legend()
-ax.invert_xaxis()
-
-plt.title('Benthic Mg/Ca')
-ax.set_ylabel('Temperature ($^{\circ}$C)')
-ax.set_xlabel('Age (Ma)')                
-fig.savefig(fig_path/'BWT_2.png', dpi=300)
-
-
-
-## plot with Meckler data on same axis using reductive correction
-hue_order=['Atlantic', 'Pacific', 'Southern']
-fig, ax =plt.subplots(figsize=(10, 8))
-p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
-                label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black')
-p4=sns.lineplot(data=cramer_temp, x='Age', y='Temperature', color='grey', 
-                label=r'Cramer et al. (2016) $\delta^{18}$O', ax=ax)
-p2=sns.lineplot(data=foram_df_BWT_Owullmund, 
-                x='age_Ma', y='BWT_reduct', hue='ocean_basin', palette='Set2', markers=True, 
-                hue_order=hue_order, style='species_simple')
-p3=sns.scatterplot(data=foram_df_BWT_other, x='age_Ma', y='BWT_reduct', hue='ocean_basin', palette='Set2', 
-                   hue_order=hue_order, marker='P', legend=False)
-# manually add legend entry for other species using only the marker (not the hue)
-ax.plot([], [], marker='P', color='black', label='Other (corrected to C. mundulus)', ls='None')
-
-ax.legend()
-ax.set_xlim(0, 65)
-ax.invert_xaxis()
-
-plt.title('Benthic Mg/Ca with reductive cleaning correction')
-ax.set_ylabel('Temperature ($^{\circ}$C)')
-ax.set_xlabel('Age (Ma)')                
-fig.savefig(fig_path/'BWT_2_reductive.png', dpi=300)
-
-
-
-
-
-## plot of Mg/Ca_foram !!!
-fig, ax =plt.subplots(figsize=(10, 8), nrows=3, sharex=True, height_ratios=[2, 1, 1])
-p1=sns.scatterplot(data=foram_df_Mg, x='age_Ma', y='Mg24', hue='species_simple', palette='Set2', 
-                   ax=ax[0], style='ocean_basin')
-p2=sns.lineplot(data=foram_df_Mg, x='age_Ma', y='Mg/Ca_sw', ax=ax[1], color='black', label='Mg/Ca_sw', 
-             legend=False)
-p3=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
-                label='Meckler et al. (2022) clumped isotopes', mfc='white', mec='black', ax=ax[2])
-ax[1].invert_xaxis()
-make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
-ax[0].set_ylabel('Mg/Ca (mmol/mol)')
-ax[1].set_ylabel('Mg/Ca (mmol/mol)')
-ax[1].invert_yaxis()
-ax[2].set_ylabel('Temperature ($^{\circ}$C)')
-ax[2].set_xlabel('Age (Ma)')
-ax[0].legend(ncol=2, fontsize=8)
-
-
-
 ## plot with Meckler data on same axis with Mg_sw !!!
 hue_order=['Atlantic', 'Pacific', 'Southern']
 fig, ax =plt.subplots(figsize=(10, 10), nrows=2, sharex=True, height_ratios=[3, 1])
@@ -423,13 +364,12 @@ fig.savefig(fig_path/'BWT_Mg_sw.png', dpi=300)
 
 
 
-
-## Lear data !!!
+## plot Lear data !!!
 fig, ax =plt.subplots(figsize=(10, 8))
 p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes', 
                 mfc='white', mec='black', ax=ax)
-sns.scatterplot(data=Lear_df, x='Age (Ma)', y='BWT_reduct', 
+sns.scatterplot(data=Lear_df, x='Age (Ma)', y='BWT', 
                 hue='ocean_basin', style='Species', palette='Set2', ax=ax)
 ax.set_xlim(0, 65)
 ax.invert_xaxis()
@@ -439,15 +379,13 @@ plt.title('Lear data')
 fig.savefig(fig_path/'Lear_BWT.png', dpi=300)
 
 
-Lear_MgCa_form_Atl=Lear_MgCa_form.loc[Lear_MgCa_form['ocean_basin']=='Atlantic']
 
-
-## Cramer data !!!
+## plot Cramer data !!!
 fig, ax =plt.subplots(figsize=(10, 8))
 p1=sns.lineplot(data=meckler_df, x='age_Ma', y='temp_c', color='black', marker='^',
                 label='Meckler et al. (2022) clumped isotopes',
                 mfc='white', mec='black', ax=ax)
-sns.scatterplot(data=cramer_MgCa, x='Age', y='BWT_reduct', 
+sns.scatterplot(data=cramer_MgCa, x='Age', y='BWT', 
                 hue='ocean_basin', style='Species', palette='Set2', ax=ax, legend=False)
 ax.set_xlim(0, 65)
 ax.invert_xaxis()
@@ -455,10 +393,6 @@ ax.set_xlabel('Age (Ma)')
 ax.set_ylabel('BWT ($^{\circ}$C)')
 plt.title('Cramer data')
 fig.savefig(fig_path/'Cramer_BWT.png', dpi=300)
-
-
-cramer_MgCa_Atl=cramer_MgCa.loc[cramer_MgCa['ocean_basin']=='Atlantic']
-
 
 
 
@@ -506,13 +440,15 @@ full_data_cibs=full_data.loc[full_data['species_simple'].str.contains('Cibicidoi
 
 
 
-## fit Lear models to Cibs linear (not very good) !!!
+## Recreate the Lear 2015 model 
 
 from scipy.optimize import curve_fit
+from lmfit import Model
+# From Lear et al (2015)
 
 def expo_fit(X, A, H, B):
     MgCa_sw, BWT = X
-    return A*MgCa_sw**H*np.exp(B*BWT)
+    return (A*MgCa_sw**H)*np.exp(B*BWT)
 
 def expo_fit_predict(X, A, H, B):
     MgCa, MgCa_sw = X
@@ -527,14 +463,71 @@ def lin_fit_predict(X, c, m, H):
     MgCa, MgCa_sw = X
     return (MgCa/MgCa_sw**H-c)/m
 
+# first test to see whether we can re-create the Lear et al (2015) model for Cibicidoides mundulus
+#for this we need to use BWT from Cramer et al 2016
+#load data
+Lear_calibration_coretop=pd.read_excel(data_path/"Lear2015_calibration_tables.xlsx", sheet_name='coretop')
+Lear_calibration_downcore=pd.read_excel(data_path/"Lear2015_calibration_tables.xlsx", sheet_name='downcore')
+
+Lear_calibration_combined=Lear_calibration_downcore[['Mg/Ca*', 'Interpolated.1']].copy()
+Lear_calibration_combined.rename(columns={'Interpolated.1':'BWT', 'Mg/Ca*':'Mg/Ca'}, inplace=True)
+Lear_calibration_combined['type']='downcore'
+
+Lear_calibration_coretop.rename(columns={'Temperature':'BWT'}, inplace=True)
+Lear_calibration_coretop= Lear_calibration_coretop.loc[pd.isnull(Lear_calibration_coretop['comment'])]
+Lear_calibration_coretop['type']='coretop'
+
+Lear_calibration_combined=pd.concat([Lear_calibration_combined, Lear_calibration_coretop[['BWT', 'Mg/Ca', 'type']]], axis=0)
+Lear_calibration_combined.reset_index(drop=True, inplace=True)
+
+
+Mg_Ca_sw_levels=[1, 1.3, 2.5]
+
+Lear_cali_results_linear_dict={'PE_Mg/Ca_sw':Mg_Ca_sw_levels, 'c':[], 'm':[], 'H':[]}
+Lear_cali_results_expo_dict={'PE_Mg/Ca_sw':Mg_Ca_sw_levels, 'A':[], 'H':[], 'B':[]}
+
+for Mg_ca_sw in Mg_Ca_sw_levels:
+    
+    Lear_calibration_combined['Mg/Ca_sw']=5.2
+    Lear_calibration_combined.loc[Lear_calibration_combined['type']=='downcore', 'Mg/Ca_sw']=Mg_ca_sw
+    
+    xdata=(Lear_calibration_combined['Mg/Ca_sw'], Lear_calibration_combined['BWT'])
+    ydata=Lear_calibration_combined['Mg/Ca'].values
+    
+    initial_guesses = [1.5, 0.1, -0.01] 
+    parameters_lin, _ = curve_fit(lin_fit, xdata, ydata, p0=initial_guesses)
+    print(f'Linear fit -- At Mg/Ca_sw = {Mg_ca_sw}: c={parameters_lin[0]:.2f}, m={parameters_lin[1]:.3f}, H={parameters_lin[2]:.2f}')
+    
+    Lear_cali_results_linear_dict['c'].append(parameters_lin[0])
+    Lear_cali_results_linear_dict['m'].append(parameters_lin[1])
+    Lear_cali_results_linear_dict['H'].append(parameters_lin[2])
+    
+    initial_guesses = [1.35, 0.03, 0.07] 
+    parameters_expo, _ = curve_fit(expo_fit, xdata, ydata, p0=initial_guesses)
+    print(f'Expo fit -- At Mg/Ca_sw = {Mg_ca_sw}: A={parameters_expo[0]:.2f}, H={parameters_expo[1]:.2f}, B={parameters_expo[2]:.3f}')
+    Lear_cali_results_expo_dict['A'].append(parameters_expo[0])
+    Lear_cali_results_expo_dict['H'].append(parameters_expo[1])
+    Lear_cali_results_expo_dict['B'].append(parameters_expo[2])
+    
+    
+Lear_cali_results_linear_df=pd.DataFrame(Lear_cali_results_linear_dict)
+Lear_cali_results_expo_df=pd.DataFrame(Lear_cali_results_expo_dict)
+#The linear parameters are close, but not exactly the same. 
+#The exponential params are quite different
+
+
+
+## Apply the fits to the Cibicidoides mundulus data
+#apply the fits to the Cibicidoides mundulus data
 
 foram_df_Mg_cibs=foram_df_Mg.loc[foram_df_Mg['species_simple'].str.contains('Cibicidoides')]
 
 xdata=(foram_df_Mg_cibs['Mg/Ca_sw'], foram_df_Mg_cibs['temp_c_smooth'].values)
 ydata=foram_df_Mg_cibs['Mg24'].values
 
-parameters, covariance = curve_fit(lin_fit, xdata, ydata)
-
+parameters, _ = curve_fit(lin_fit, xdata, ydata)
+print(f'Linear fit -- c={parameters_lin[0]:.2f}, m={parameters_lin[1]:.3f}, H={parameters_lin[2]:.2f}')
+    
 xdata_predict=(foram_df_Mg_cibs['Mg24'], foram_df_Mg_cibs['Mg/Ca_sw'])
 foram_df_Mg_cibs['BWT_lin']=lin_fit_predict(xdata_predict, *parameters)
 
@@ -649,8 +642,12 @@ make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.4)
 
 ## fit Lear models to Cibs exponential
 
-parameters, covariance = curve_fit(expo_fit, xdata, ydata)
 
+xdata=(foram_df_Mg_cibs['Mg/Ca_sw'], foram_df_Mg_cibs['temp_c_smooth'].values)
+ydata=foram_df_Mg_cibs['Mg24'].values
+
+parameters, _ = curve_fit(expo_fit, xdata, ydata)
+print(f'Expo fit -- A={parameters_expo[0]:.2f}, H={parameters_expo[1]:.2f}, B={parameters_expo[2]:.3f}')
 foram_df_Mg_cibs['BWT_expo']=expo_fit_predict(xdata_predict, *parameters)
 
 ypredict_2=expo_fit_predict((x_predict, np.array([2]*len(x_predict))), *parameters)
@@ -682,7 +679,7 @@ fig.suptitle('Cibs only. Lear et al., 2015, exponential')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
 
 
-parameters_dict['Lear_exponential_Cibs']= parameters
+
 
 
 
@@ -1126,7 +1123,5 @@ ax[1].set_xlim(0, 65)
 ax[1].invert_xaxis()
 fig.suptitle('Oridisalis only. OLS, w Lear data')
 make_stacked_plot(fig, ax, epoch_lines=True, adjust=-0.3)
-
-parameters_dict['OLS_Oridisalis_wLearData']=parameters
 
 
